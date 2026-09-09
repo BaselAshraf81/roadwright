@@ -101,7 +101,7 @@ export function validateOutline(
       refusal: refuse(
         "too-few-points",
         "NOT ENOUGH OF A SHAPE",
-        "There is not enough here to roll. Draw a closed loop.",
+        "That is too small to make a wheel. Draw a bigger loop.",
       ),
     };
   }
@@ -116,7 +116,7 @@ export function validateOutline(
       refusal: refuse(
         "self-intersecting",
         "THE LINE CROSSES ITSELF",
-        "Your line crosses over itself, so there is no single inside to build a wheel from. Draw it again in one loop without lifting back over.",
+        "An outline cannot cross itself. Try again.",
       ),
     };
   }
@@ -130,7 +130,7 @@ export function validateOutline(
       refusal: refuse(
         "zero-area",
         "THE SHAPE IS FLAT",
-        "That is a line rather than a shape, so there is nothing to roll. Draw something with an inside.",
+        "That is a line, not a wheel. Draw a loop with an inside.",
       ),
     };
   }
@@ -168,7 +168,7 @@ export function validateOutline(
     refusal: refuse(
       "cannot-roll",
       "THIS ONE WILL NOT ROLL",
-      "This shape cannot be turned into a wheel, even after bridging its gaps. Try a rounder loop.",
+      "This one cannot be made into a wheel. Try a rounder loop.",
       directZone.blockingVertices,
     ),
   };

@@ -1,6 +1,6 @@
 # Roadwright
 
-Draw a shape. See the road it rolls on.
+Draw a wheel. See the road it rolls on.
 
 Live at https://baselashraf.com/roadwright/
 Source at https://github.com/BaselAshraf81/roadwright

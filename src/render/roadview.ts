@@ -112,8 +112,12 @@ export function gradeFromHandleDrag(
 const SIDE_PADDING = 30;
 const TOP_PADDING = 26;
 const FOOT_ROOM = 38;
-/** Extra height above the wheels, as a fraction of reach, to seat the chassis. */
-const CHASSIS_HEADROOM = 0.34;
+/**
+ * Extra height above the axle line, as a multiple of the wheel's reach, to seat the
+ * car body. The body is about 2.3 reaches tall, and the wheel itself needs one, so
+ * the surplus over the wheel is 1.3.
+ */
+const BODY_HEADROOM = 1.3;
 
 /**
  * Camera and visible span for the road band, solved together.
@@ -134,8 +138,10 @@ export function roadView(
   const { road, travelled, rolling, wheelbase } = state;
 
   const reach = Math.max(road.maxDepth, 1e-6);
-  // Room for the wheels above the datum, the road below, and the chassis on top.
-  const totalVertical = reach * 2 + reach * CHASSIS_HEADROOM;
+  // Below the axle line: the road, one reach deep. Above it: the wheel, one reach,
+  // plus the car body's surplus over the wheel when an assembly is shown.
+  const headroom = wheelbase > 0 ? BODY_HEADROOM : 0;
+  const totalVertical = reach * 2 + reach * headroom;
 
   const usableW = Math.max(vp.width - SIDE_PADDING * 2, 1);
   const usableH = Math.max(vp.height - TOP_PADDING - FOOT_ROOM, 1);
@@ -169,7 +175,7 @@ export function roadView(
     camera: {
       scale,
       originX: SIDE_PADDING - camX * scale,
-      originY: TOP_PADDING + slack / 2 + reach * (1 + CHASSIS_HEADROOM) * scale,
+      originY: TOP_PADDING + slack / 2 + reach * (1 + headroom) * scale,
     },
     span,
   };
@@ -345,43 +351,100 @@ function traceBelowRoad(
 }
 
 /**
- * A cart body sitting on the chassis.
+ * The car body, traced from Basel's own sketch.
  *
- * Basel asked for something like a drawn car. A cartoon would wreck a drafting sheet,
- * so this is a side elevation of a flatbed cart: a tapered body, a bench, and a
- * handle. Straight lines, one ink, no shading. It reads as a vehicle at a glance and
- * gives the level chassis something to carry, which is what makes the level ride feel
- * like it matters.
+ * A side elevation facing left: long bonnet, tall cabin, windscreen, headrest and
+ * steering wheel, open along the bottom where the wheels go. Coordinates are
+ * normalised to 0..1, x left to right and y top to bottom, so the drawing scales to
+ * whatever wheelbase is set.
+ *
+ * Kept as the author's own line rather than redrawn into something neater. It is the
+ * one hand-made thing on a sheet full of computed curves, and the chassis it sits on
+ * is what makes the level ride legible.
  */
-function drawCartBody(
+const CAR_SILHOUETTE: ReadonlyArray<readonly [number, number]> = [
+  // Both ends are pulled down to 1.0 so the underside closes flat. In the sketch the
+  // line simply stops in mid-air at each end, which is fine for an open drawing but
+  // would close on a diagonal once filled, and that diagonal reads as a mistake.
+  [0.0, 1.0],
+  [0.022, 0.74],
+  [0.05, 0.642],
+  [0.088, 0.594],
+  [0.133, 0.57],
+  [0.196, 0.562],
+  [0.272, 0.56],
+  [0.311, 0.563],
+  [0.33, 0.5],
+  [0.356, 0.391],
+  [0.385, 0.27],
+  [0.417, 0.152],
+  [0.445, 0.07],
+  [0.472, 0.013],
+  [0.517, 0.0],
+  [0.563, 0.004],
+  [0.606, 0.013],
+  [0.645, 0.05],
+  [0.678, 0.113],
+  [0.703, 0.23],
+  [0.722, 0.364],
+  [0.736, 0.462],
+  [0.744, 0.517],
+  [0.783, 0.522],
+  [0.828, 0.526],
+  [0.865, 0.556],
+  [0.9, 0.603],
+  [0.937, 0.7],
+  [0.972, 0.815],
+  [0.99, 0.93],
+  [1.0, 1.0],
+];
+
+/** Windscreen and A-pillar, the inner line in the sketch. */
+const CAR_PILLAR: ReadonlyArray<readonly [number, number]> = [
+  [0.581, 0.04],
+  [0.571, 0.2],
+  [0.567, 0.404],
+  [0.605, 0.475],
+  [0.649, 0.53],
+];
+
+function drawCarBody(
   ctx: CanvasRenderingContext2D,
   cam: Camera,
   leadX: number,
   trailX: number,
-  liftPx: number,
+  reachPx: number,
 ): void {
-  const deckY = cam.originY - liftPx;
+  // Lifted clear of the axle line rather than sitting on it. A real floor sits above
+  // the axle anyway, and when the two coincided the body's dark sill painted over the
+  // blue datum, which is the one line on the sheet that must always stay readable.
+  const deckY = cam.originY - reachPx * 0.22;
   const x1 = cam.originX + trailX * cam.scale;
   const x2 = cam.originX + leadX * cam.scale;
-  const width = x2 - x1;
-  if (width < 46) return; // Too cramped to read; the chassis alone carries it.
+  const span = x2 - x1;
+  if (span < 54) return; // Too cramped for the body to read.
 
-  const overhang = 16;
+  // The body overhangs both axles, as a real one does.
+  const overhang = span * 0.15;
   const left = x1 - overhang;
-  const right = x2 + overhang;
-  const bodyH = Math.max(20, Math.min(52, width * 0.26));
-  const top = deckY - 7 - bodyH;
-  const inset = Math.min(14, width * 0.09);
+  const bodyW = span + overhang * 2;
+  // Height comes from the WHEEL, not the width. Tying it to width made the car
+  // stretch into a flat sliver whenever the wheelbase grew. A real body is roughly
+  // one and a bit wheel diameters tall, so that is the ratio used here.
+  const bodyH = reachPx * 2.3;
+  const top = deckY - bodyH;
 
-  ctx.lineJoin = "miter";
+  const px = (n: number): number => left + n * bodyW;
+  const py = (n: number): number => top + n * bodyH;
 
-  // Closed and filled, so it reads as a body rather than as scaffolding. The filled
-  // wheels are drawn after this and cover it, which is the point.
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+
+  // Silhouette, closed along the bottom so it can be filled and so the wheels drawn
+  // afterwards cover it.
   ctx.beginPath();
-  ctx.moveTo(left, deckY - 6);
-  ctx.lineTo(left + inset, top);
-  ctx.lineTo(right - inset * 1.5, top);
-  ctx.lineTo(right, deckY - 6);
+  ctx.moveTo(px(CAR_SILHOUETTE[0]![0]), py(CAR_SILHOUETTE[0]![1]));
+  for (const [nx, ny] of CAR_SILHOUETTE.slice(1)) ctx.lineTo(px(nx), py(ny));
   ctx.closePath();
   ctx.fillStyle = INK.band;
   ctx.fill();
@@ -389,79 +452,41 @@ function drawCartBody(
   ctx.lineWidth = WEIGHT.medium;
   ctx.stroke();
 
-  // A bench back over the trailing wheel, which is what makes it read as a cart
-  // rather than a crate.
-  const benchX = left + inset + (right - left) * 0.13;
-  const benchW = (right - left) * 0.22;
-  const benchH = bodyH * 0.5;
+  ctx.lineWidth = WEIGHT.thin;
+
+  // Windscreen and pillar.
   ctx.beginPath();
-  ctx.moveTo(benchX, top);
-  ctx.lineTo(benchX, top - benchH);
-  ctx.lineTo(benchX + benchW, top - benchH);
-  ctx.lineTo(benchX + benchW, top);
+  ctx.moveTo(px(CAR_PILLAR[0]![0]), py(CAR_PILLAR[0]![1]));
+  for (const [nx, ny] of CAR_PILLAR.slice(1)) ctx.lineTo(px(nx), py(ny));
+  ctx.stroke();
+
+  // Only draw the cabin details once there is room for them to read.
+  if (bodyW < 150) return;
+
+  // Headrest.
+  const hrX = px(0.661);
+  const hrY = py(0.146);
+  const hrW = px(0.694) - hrX;
+  const hrH = py(0.305) - hrY;
+  ctx.beginPath();
+  ctx.moveTo(hrX, hrY + hrH * 0.3);
+  ctx.quadraticCurveTo(hrX, hrY, hrX + hrW * 0.5, hrY);
+  ctx.quadraticCurveTo(hrX + hrW, hrY, hrX + hrW, hrY + hrH * 0.3);
+  ctx.lineTo(hrX + hrW, hrY + hrH);
+  ctx.lineTo(hrX, hrY + hrH);
   ctx.closePath();
-  ctx.fillStyle = INK.band;
-  ctx.fill();
-  ctx.lineWidth = WEIGHT.thin;
   ctx.stroke();
 
-  // A side panel line, the kind of single detail a side elevation carries.
+  // Steering wheel.
   ctx.beginPath();
-  ctx.moveTo(left + inset * 1.4, top + bodyH * 0.45);
-  ctx.lineTo(right - inset * 1.8, top + bodyH * 0.45);
+  ctx.arc(px(0.702), py(0.444), Math.max(3, bodyW * 0.024), 0, Math.PI * 2);
   ctx.stroke();
-}
 
-/**
- * The chassis: a member held parallel to the datum, carrying both hubs.
- *
- * This is the point of the assembly. A bar staying exactly parallel to a reference
- * line is the oldest way in drawing to show that something does not move, and it
- * needs no caption. Drafting ink rather than slate, because it is a rigid part and
- * slate belongs to the datum alone.
- */
-function drawChassis(
-  ctx: CanvasRenderingContext2D,
-  cam: Camera,
-  leadX: number,
-  trailX: number,
-  liftPx: number,
-): void {
-  const y = cam.originY - liftPx;
-  const x1 = cam.originX + trailX * cam.scale;
-  const x2 = cam.originX + leadX * cam.scale;
-  const overhang = 16;
-  const thickness = 7;
-
-  ctx.strokeStyle = INK.road;
-  ctx.lineWidth = WEIGHT.medium;
-
-  // The member itself, drawn as a section rather than a single line.
+  // Dash, the short run from the pillar to the steering column.
   ctx.beginPath();
-  ctx.moveTo(x1 - overhang, crisp(y - thickness / 2));
-  ctx.lineTo(x2 + overhang, crisp(y - thickness / 2));
-  ctx.moveTo(x1 - overhang, crisp(y + thickness / 2));
-  ctx.lineTo(x2 + overhang, crisp(y + thickness / 2));
+  ctx.moveTo(px(0.645), py(0.35));
+  ctx.lineTo(px(0.7), py(0.40));
   ctx.stroke();
-
-  // End caps and drop links down to each hub.
-  ctx.lineWidth = WEIGHT.thin;
-  ctx.beginPath();
-  ctx.moveTo(crisp(x1 - overhang), y - thickness / 2);
-  ctx.lineTo(crisp(x1 - overhang), y + thickness / 2);
-  ctx.moveTo(crisp(x2 + overhang), y - thickness / 2);
-  ctx.lineTo(crisp(x2 + overhang), y + thickness / 2);
-  for (const x of [x1, x2]) {
-    ctx.moveTo(crisp(x), y + thickness / 2);
-    ctx.lineTo(crisp(x), cam.originY);
-  }
-  ctx.stroke();
-
-  ctx.font = sheetFont(9, 600);
-  ctx.fillStyle = INK.graphite;
-  ctx.textAlign = "left";
-  ctx.textBaseline = "bottom";
-  ctx.fillText("CHASSIS", x1 - overhang, y - thickness / 2 - 8);
 }
 
 /** The wheel, rotated so its contact point faces straight down. */
@@ -719,9 +744,7 @@ export function drawRoadBand(vp: Viewport, state: RoadState): void {
 
     // Body and chassis first, so the filled wheels cover them as real wheels would.
     if (hasAssembly) {
-      const lift = road.maxDepth * CHASSIS_HEADROOM * cam.scale;
-      drawCartBody(ctx, cam, leadX, trailX, lift);
-      drawChassis(ctx, cam, leadX, trailX, lift);
+      drawCarBody(ctx, cam, leadX, trailX, road.maxDepth * cam.scale);
     }
 
     for (const w of wheels) drawWheel(ctx, cam, centred, w.x, w.theta);

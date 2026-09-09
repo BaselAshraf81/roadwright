@@ -3,11 +3,56 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Roadwright: draw a shape, see the road it rolls on</title>
+    <title>Roadwright: draw a wheel, see the road it rolls on</title>
     <meta
       name="description"
-      content="Draw any shape and Roadwright solves for the road it rolls on with its axle dead level. A square rolls smoothly on linked catenaries. Yours rolls on something stranger."
+      content="Draw any wheel and Roadwright works out the road it rolls along with its axle dead level. A square rolls smoothly on a row of hanging-chain curves. Yours rolls on something stranger."
     />
+    <link rel="canonical" href="https://baselashraf.com/roadwright/" />
+    <meta name="author" content="Basel Ashraf" />
+    <meta name="theme-color" content="#d8d9ce" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Roadwright: draw a wheel, see the road it rolls on" />
+    <meta
+      property="og:description"
+      content="A square wheel rolls perfectly smoothly on the right road. Draw any wheel and Roadwright works out the road for it."
+    />
+    <meta property="og:url" content="https://baselashraf.com/roadwright/" />
+    <meta property="og:image" content="https://baselashraf.com/media/roadwright-og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="A drawn car on two rounded wheels rolling along the road solved for them, with its axle line dead level."
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://baselashraf.com/media/roadwright-og.png" />
+    <meta name="twitter:creator" content="@BaselAshraf81" />
+    <meta name="twitter:title" content="Roadwright: draw a wheel, see the road it rolls on" />
+    <meta
+      name="twitter:description"
+      content="A square wheel rolls perfectly smoothly on the right road. Draw any wheel and Roadwright works out the road for it."
+    />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Roadwright",
+        "url": "https://baselashraf.com/roadwright/",
+        "applicationCategory": "EducationalApplication",
+        "operatingSystem": "Any browser",
+        "description": "Draw a closed wheel and Roadwright solves the road profile that carries it with its axle at a constant height, then animates it rolling.",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "author": {
+          "@type": "Person",
+          "name": "Basel Ashraf",
+          "url": "https://baselashraf.com/"
+        },
+        "license": "https://opensource.org/licenses/MIT",
+        "codeRepository": "https://github.com/BaselAshraf81/roadwright",
+        "citation": "Leon Hall and Stan Wagon, Roads and Wheels, Mathematics Magazine 65 (1992)"
+      }
+    </script>
     <!-- Inline mark: a wheel on its road. Avoids a favicon round trip and a 404. -->
     <link
       rel="icon"
@@ -20,7 +65,7 @@
       <header class="sheet-head">
         <a class="sheet-back" href="/">Basel Ashraf</a>
         <h1 id="sheet-title">Roadwright</h1>
-        <p class="sheet-sub">Draw a shape. See the road it rolls on.</p>
+        <p class="sheet-sub">Draw a wheel. See the road it rolls on.</p>
       </header>
 
       <div class="bands">
@@ -48,7 +93,7 @@
               <path d="M14.2 6.6 L17.4 9.8" />
               <path d="M4.6 16.2 L7.8 19.4" />
             </svg>
-            <span id="draw-btn-label">Draw your own</span>
+            <span id="draw-btn-label">Draw a wheel</span>
           </button>
         </section>
 
@@ -66,7 +111,7 @@
       <aside class="margin-readout" aria-live="polite" aria-atomic="true">
         <p class="readout-label">Note 1</p>
         <p id="readout" class="readout-line">
-          Pick a form or draw your own, and the sheet works out the road.
+          Pick a wheel or draw your own, and the sheet works out its road.
         </p>
       </aside>
 

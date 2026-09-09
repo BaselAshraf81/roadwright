@@ -311,7 +311,7 @@ function solve(outline: Polygon, requestedHub?: Vec, animate = false): void {
 function describe(): string {
   if (state.refusal) return state.refusal.message;
   const s = state.solved;
-  if (!s) return "Pick a shape or draw your own, and the sheet works out the road.";
+  if (!s) return "Pick a wheel or draw your own, and the sheet works out its road.";
 
   const verdict = bindVerdict(s.interference);
   const pct = (s.interference * 100).toFixed(1);
@@ -366,7 +366,7 @@ function paintChrome(): void {
 
   drawBtn.setAttribute("aria-pressed", String(state.drawingMode));
   // Only the label changes, so the pencil glyph survives the update.
-  drawBtnLabel.textContent = state.drawingMode ? "Cancel" : "Draw your own";
+  drawBtnLabel.textContent = state.drawingMode ? "Cancel" : "Draw a wheel";
   stopBtn.textContent = state.paused ? "Resume roll" : "Pause roll";
 
   const wb = state.wheelbasePeriods;
@@ -526,7 +526,7 @@ function setDrawingMode(on: boolean): void {
   state.strokePreview = null;
   detailCanvas.classList.toggle("is-drawing", on);
   readout.textContent = on
-    ? "Draw a closed loop in the upper band. Release to solve its road."
+    ? "Draw a closed loop in the upper band. Let go and the sheet solves its road."
     : describe();
   render();
 }
@@ -543,14 +543,40 @@ attachDrawing(
     },
     onFinish: (outline) => {
       if (!state.drawingMode) return;
+
+      // Keep what was on the sheet, so a rejected stroke can be undone rather than
+      // leaving the visitor staring at a broken drawing. Being left holding a dead
+      // canvas is worse than a clear sentence and the previous shape back.
+      const previousOutline = state.outline;
+      const previousHub = state.hub;
+      const previousSource = state.sourceId;
+
       state.strokePreview = null;
       state.sourceId = null;
       state.travelled = 0;
       solve(outline);
+
       if (state.solved) {
         writeFragment(encodeOutlineFragment(state.solved.outline, state.solved.hub));
+        setDrawingMode(false);
+        return;
       }
-      setDrawingMode(false);
+
+      // Refused. Say why in one line, put the sheet back, and stay in drawing mode so
+      // the next attempt needs no extra click.
+      const reason = state.refusal?.message ?? "That one will not roll. Try again.";
+      state.sourceId = previousSource;
+      if (previousOutline.length >= 3) {
+        solve(previousOutline, previousHub ?? undefined);
+      } else {
+        state.outline = [];
+        state.hub = null;
+        state.solved = null;
+      }
+      state.refusal = null;
+      render();
+      readout.textContent = reason;
+      readout.classList.add("is-refusal");
     },
     onDiscard: (reason) => {
       if (!state.drawingMode) return;

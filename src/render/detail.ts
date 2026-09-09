@@ -372,7 +372,7 @@ export function drawDetail(vp: Viewport, state: DetailState): void {
   ctx.fillStyle = INK.graphite;
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
-  ctx.fillText("FIG 1  YOUR SHAPE", 12, 10);
+  ctx.fillText("FIG 1  YOUR WHEEL", 12, 10);
   ctx.fillText(
     zone && zone.exists ? "SHADED: WHERE THE AXLE CAN GO" : "NO AXLE POSITION WORKS",
     12,

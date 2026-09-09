@@ -1,11 +1,9 @@
 # Roadwright
 
-**Draw a shape. See the road it rolls on.**
+**Draw a wheel. See the road it rolls on.**
 
 [![CI](https://github.com/BaselAshraf81/roadwright/actions/workflows/ci.yml/badge.svg)](https://github.com/BaselAshraf81/roadwright/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Runtime dependencies: 0](https://img.shields.io/badge/runtime%20dependencies-0-brightgreen.svg)](package.json)
-[![Bundle: 18 kB gzipped](https://img.shields.io/badge/bundle-18%20kB%20gzipped-brightgreen.svg)](#running-it)
 
 **[Try it](https://baselashraf.com/roadwright/)**
 
@@ -99,7 +97,7 @@ horizontal, so grade costs no accuracy at all.
 
 ## What you can do with it
 
-- Draw a shape, or pick one of seven.
+- Draw a wheel, or pick one of seven.
 - Drag the axle inside the shaded area to change the road. Deep dips or shallow ones
   are yours to choose.
 - Tilt the road by dragging either end of the axle line. Grade reads out as a
