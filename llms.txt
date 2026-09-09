@@ -1,0 +1,78 @@
+# Roadwright
+
+Draw a shape. See the road it rolls on.
+
+Live at https://baselashraf.com/roadwright/
+Source at https://github.com/BaselAshraf81/roadwright
+
+## What it does
+
+You draw a closed shape. Roadwright works out the road profile that shape rolls
+along while its axle stays at a constant height, then animates it rolling. A square
+rolls on a row of inverted catenaries. A pentagon, a star, or a hand-drawn blob each
+roll on something different.
+
+## The mathematics
+
+Describe the wheel in polar form as r(theta) measured from its axle. For the axle to
+travel level, the contact point sits directly below it at distance r, so the road
+height is y = -r. Rolling without slipping matches arc length along the road to arc
+length along the wheel, which gives dx = r dtheta. Therefore:
+
+  x(theta) = integral of r dtheta
+  y(theta) = -r(theta)
+
+Read backwards, road to wheel:
+
+  theta(x) = integral of dx / (-y(x))
+  r(theta) = -y(x(theta))
+
+Both directions are quadratures. There is no solver, no iteration, and no
+convergence tolerance, which is why the road can be recomputed while a control is
+being dragged.
+
+A periodic road carries a closed wheel only when the total angle turned over one
+period is exactly one full turn: integral of dx / (-y) = 2*pi.
+
+## What is verified, by automated test
+
+- A square wheel of half-side a returns y = -a*cosh(x/a), an inverted catenary, to
+  better than one part in a million.
+- A circle returns a flat road.
+- Road arc length equals the wheel perimeter, which is what rolling without slipping
+  means.
+- The road's horizontal period is NOT the wheel perimeter. For a square of half-side
+  a it is 8*a*ln(1 + sqrt(2)), about 7.0509a, against a perimeter of 8a. Only a
+  circle makes the two quantities agree.
+- Wheel to road to wheel round-trips, so both directions agree.
+- Interference, meaning how far a wheel drives into its own road, is measured rather
+  than estimated. A circle and a square measure zero. An equilateral triangle
+  measures 4.7 percent and a five-pointed star 21.5 percent, and neither can be
+  built, which matches the known fact that a rolling equilateral triangle jams
+  because its corners bind in the ruts.
+- A wheelbase of a whole number of road periods puts two independent wheels in
+  identical orientation, which follows from the closure condition.
+
+## Constraints, stated honestly
+
+- The wheel must be star-shaped about its axle, meaning a ray from the axle crosses
+  the outline exactly once in every direction. Drawings that fail this are bridged
+  into the closest shape that satisfies it, and the change is shown and reported
+  rather than applied silently.
+- A shape can be perfectly valid on paper and impossible to build. Sharp corners
+  drive into the road as the wheel turns. The interference figure reports this.
+- Tilting the road is exact rather than an approximation. The derivation never
+  mentions gravity; it only requires the axle to travel along a straight line, and
+  nothing requires that line to be horizontal.
+
+## Sources
+
+- Leon Hall and Stan Wagon, "Roads and Wheels", Mathematics Magazine 65 (1992).
+- G. B. Robison derived the general road-wheel equations in 1960.
+- Stan Wagon and Loren Kellen built a square-wheeled bicycle at Macalester College
+  in 1997. The National Museum of Mathematics and the Exploratorium both exhibit a
+  square-wheeled tricycle.
+
+## Author
+
+Basel Ashraf. https://baselashraf.com

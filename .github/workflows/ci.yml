@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm ci
+
+      # Types first. Most of what can go wrong in a geometry codebase is a sign
+      # error or a mixup between an angle and an arc length, and types catch a
+      # useful share of those before a test runs.
+      - name: Typecheck
+        run: npm run typecheck
+
+      # The accuracy proofs live here: a square wheel must return inverted
+      # catenaries and a circle must return a flat line.
+      - name: Tests
+        run: npm test
+
+      - name: Build
+        run: npx vite build

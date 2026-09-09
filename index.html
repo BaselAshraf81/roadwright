@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Roadwright: draw a shape, see the road it rolls on</title>
+    <meta
+      name="description"
+      content="Draw any shape and Roadwright solves for the road it rolls on with its axle dead level. A square rolls smoothly on linked catenaries. Yours rolls on something stranger."
+    />
+    <!-- Inline mark: a wheel on its road. Avoids a favicon round trip and a 404. -->
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23D8D9CE'/%3E%3Cpath d='M2 22c4 0 4-8 8-8s4 8 8 8 4-8 8-8 4 8 8 8' fill='none' stroke='%231A1F23' stroke-width='2'/%3E%3Crect x='9' y='7' width='11' height='11' fill='none' stroke='%23A8342A' stroke-width='2' transform='rotate(20 14.5 12.5)'/%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="/styles/sheet.css" />
+  </head>
+  <body>
+    <main class="sheet" aria-labelledby="sheet-title">
+      <header class="sheet-head">
+        <a class="sheet-back" href="/">Basel Ashraf</a>
+        <h1 id="sheet-title">Roadwright</h1>
+        <p class="sheet-sub">Draw a shape. See the road it rolls on.</p>
+      </header>
+
+      <div class="bands">
+        <section class="band band-detail" aria-labelledby="detail-heading">
+          <h2 id="detail-heading" class="visually-hidden">
+            Your shape, and where its axle can sit
+          </h2>
+          <canvas id="detail-canvas"></canvas>
+          <!-- The primary action sits in the band where drawing happens, not in a
+               control block below the fold. A real button, so it is keyboard
+               reachable and screen readers announce it. -->
+          <button id="draw-btn" class="draw-cta" type="button" aria-pressed="false">
+            <svg
+              class="draw-cta__icon"
+              viewBox="0 0 24 24"
+              width="17"
+              height="17"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.7"
+              stroke-linecap="square"
+              aria-hidden="true"
+            >
+              <path d="M4 20 L4.6 16.2 L16.4 4.4 L19.6 7.6 L7.8 19.4 Z" />
+              <path d="M14.2 6.6 L17.4 9.8" />
+              <path d="M4.6 16.2 L7.8 19.4" />
+            </svg>
+            <span id="draw-btn-label">Draw your own</span>
+          </button>
+        </section>
+
+        <section class="band band-road" aria-labelledby="road-heading">
+          <h2 id="road-heading" class="visually-hidden">
+            Road profile: the road your outline rolls on
+          </h2>
+          <canvas id="road-canvas"></canvas>
+        </section>
+      </div>
+
+      <!-- Readouts are lettered into the sheet's own margin. No panel floats above
+           the drawing. Discipline donated by the ASCII world, where captions live
+           inside the same grid as the image. -->
+      <aside class="margin-readout" aria-live="polite" aria-atomic="true">
+        <p class="readout-label">Note 1</p>
+        <p id="readout" class="readout-line">
+          Pick a form or draw your own, and the sheet works out the road.
+        </p>
+      </aside>
+
+      <div class="title-block">
+        <div class="tb-row tb-forms">
+          <span class="tb-label" id="forms-label">Shape</span>
+          <div
+            class="form-list"
+            id="form-list"
+            role="group"
+            aria-labelledby="forms-label"
+          ></div>
+        </div>
+
+        <div class="tb-row">
+          <span class="tb-label" id="gauge-label">Catches by</span>
+          <div class="gauge" id="gauge" role="img" aria-labelledby="gauge-label">
+            <div class="gauge-fill" id="gauge-fill"></div>
+            <div class="gauge-mark" style="left: 50%" aria-hidden="true"></div>
+          </div>
+          <span class="tb-value" id="gauge-value">0.00%</span>
+        </div>
+
+        <div class="tb-row">
+          <label class="tb-label" for="speed">Roll speed</label>
+          <input
+            id="speed"
+            class="tb-range"
+            type="range"
+            min="0"
+            max="2.5"
+            step="0.05"
+            value="0.8"
+          />
+          <span class="tb-value" id="speed-value">0.80</span>
+        </div>
+
+        <div class="tb-row">
+          <label class="tb-label" for="wheelbase">Wheelbase</label>
+          <input
+            id="wheelbase"
+            class="tb-range"
+            type="range"
+            min="0"
+            max="3"
+            step="0.05"
+            value="1"
+            aria-describedby="wheelbase-hint"
+          />
+          <span class="tb-value" id="wheelbase-value">1.00 P</span>
+        </div>
+        <p class="tb-hint" id="wheelbase-hint">
+          Counted in road lengths. Land on a whole number and both wheels turn the
+          same way at the same time. Slide it to zero for a single wheel.
+        </p>
+
+        <div class="tb-row tb-actions">
+          <button id="stop-btn" class="btn" type="button">Pause roll</button>
+          <button
+            id="sound-btn"
+            class="btn"
+            type="button"
+            aria-pressed="false"
+            aria-describedby="sound-hint"
+          >
+            Spin sound off
+          </button>
+        </div>
+        <p class="tb-hint" id="sound-hint">
+          A whistle when the wheel whips round a tight corner. Pitch follows the
+          measured spin, so nothing here is decoration.
+        </p>
+
+        <div class="tb-row tb-actions">
+          <button id="share-btn" class="btn" type="button">Copy link</button>
+          <button id="png-btn" class="btn" type="button">Save PNG</button>
+          <button id="svg-btn" class="btn" type="button">Cut file</button>
+          <button id="video-btn" class="btn" type="button">Record loop</button>
+        </div>
+
+        <p class="tb-stamp">
+          <span id="stamp-status">Sheet 1 of 1</span>
+        </p>
+      </div>
+
+      <!-- The agate billing block, earned from the exploitation one-sheet: dense,
+           subordinate in type, complete in fact. -->
+      <footer class="spec">
+        <div class="spec-col">
+          <h3>How it works</h3>
+          <p>
+            The road has to hold the axle at a fixed height, so wherever the wheel
+            touches down, the ground must sit exactly as far below the axle as the
+            wheel's edge is from its centre. Rolling without sliding fixes the rest.
+            In symbols: <em>y</em> = &minus;<em>r</em> and
+            d<em>x</em> = <em>r</em>&nbsp;d&theta;, so
+            <em>x</em>(&theta;) = &int;<em>r</em>&nbsp;d&theta;. Backwards,
+            &theta;(<em>x</em>) = &int;d<em>x</em>&nbsp;/&nbsp;(&minus;<em>y</em>).
+          </p>
+        </div>
+        <div class="spec-col">
+          <h3>What your shape decides</h3>
+          <p>
+            Your outline and where you put the axle decide the whole road: its
+            shape, how long one length of it is, how high the axle rides, and
+            whether a road exists at all. You choose the speed, the tilt, the
+            spacing, and the cut size. Nothing else is adjustable, because nothing
+            else should be.
+          </p>
+        </div>
+        <div class="spec-col">
+          <h3>Checked, not claimed</h3>
+          <p>
+            A square gives a row of hanging-chain curves, exactly
+            &minus;<em>a</em>&nbsp;cosh(<em>x</em>/<em>a</em>), to better than one
+            part in a million. A circle gives a flat line. Both run as tests on
+            every change, along with the fact that the road is exactly as long as
+            the wheel's edge. Tilting the road is exact too: nothing in the
+            derivation ever mentioned gravity.
+          </p>
+        </div>
+        <div class="spec-col">
+          <h3>Sources</h3>
+          <p>
+            Leon Hall and Stan Wagon,
+            <a
+              href="https://www.jstor.org/stable/2690665"
+              rel="noopener"
+              >Roads and Wheels</a
+            >, Mathematics Magazine 65 (1992). G. B. Robison derived the general
+            equations in 1960. Wagon and Loren Kellen built a
+            <a
+              href="https://www.macalester.edu/mscs/multimedia/squarewheeledbike/squarewheelbike/"
+              rel="noopener"
+              >square-wheeled bicycle</a
+            >
+            at Macalester in 1997. The
+            <a href="https://momath.org/sqwt/" rel="noopener"
+              >National Museum of Mathematics</a
+            >
+            and the Exploratorium both exhibit one.
+          </p>
+        </div>
+      </footer>
+    </main>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,503 @@
+/*
+ * Roadwright: a tinted-vellum drafting sheet.
+ *
+ * Four functional ink roles, kept in sync with src/render/theme.ts by hand:
+ *   --ink       computed road
+ *   --oxide     the outline the visitor drew
+ *   --slate     the datum, reserved, never borrowed by chrome
+ *   --graphite  neutral sheet furniture
+ *
+ * Text and controls are real DOM, not painted into canvas. A drafting sheet's
+ * single-stroke lettering was the reason the pen-plotter direction lost: legibility
+ * and screen-reader access matter more than medium purity. Canvas carries geometry
+ * only.
+ */
+
+:root {
+  --vellum: #d8d9ce;
+  --band: #e2e3d9;
+  --ink: #1a1f23;
+  --oxide: #a8342a;
+  --slate: #2e5c8a;
+  /*
+   * Measured, not guessed. The first graphite was #6e7168, which gives only 3.5:1
+   * on the vellum ground and fails AA for the small labels. #5a5d55 measures 4.71:1
+   * on vellum and 5.18:1 on the band. Recording the numbers here so a later tweak
+   * cannot quietly undo it.
+   */
+  --graphite: #5a5d55;
+  --rule: 1px solid var(--graphite);
+  --hair: 1px solid color-mix(in srgb, var(--graphite) 45%, transparent);
+
+  --font: "Bahnschrift", "Bahnschrift SemiCondensed", "DIN Alternate",
+    "Roboto Condensed", "Arial Narrow", system-ui, sans-serif;
+
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* A class rule outranks the UA stylesheet, so [hidden] needs the override. */
+[hidden] {
+  display: none !important;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--vellum);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+  -webkit-text-size-adjust: 100%;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* The sheet frame. A drafting border, not a card. */
+.sheet {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 18px;
+  display: grid;
+  /* A definite first track. An auto track containing a min(..., 100%) width is a
+     cyclic dependency and collapses to zero. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+
+.sheet-head {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  flex-wrap: wrap;
+  border-bottom: 2px solid var(--ink);
+  padding-bottom: 8px;
+}
+
+/* Back to the rest of the site. This lives at a path on the main domain. */
+.sheet-back {
+  order: -1;
+  flex: 1 0 100%;
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--graphite);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  align-self: flex-start;
+  width: fit-content;
+}
+
+.sheet-back::before {
+  content: "\2190";
+  margin-right: 7px;
+}
+
+.sheet-back:hover,
+.sheet-back:focus-visible {
+  color: var(--ink);
+  border-bottom-color: var(--ink);
+}
+
+.sheet-back:focus-visible {
+  outline: 2px solid var(--slate);
+  outline-offset: 3px;
+}
+
+.sheet-head h1 {
+  margin: 0;
+  font-size: clamp(1.4rem, 3.4vw, 2.1rem);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.sheet-sub {
+  margin: 0;
+  color: var(--graphite);
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+}
+
+/* Two ruled bands. The road band is dominant, since it carries the payoff. */
+.bands {
+  display: grid;
+  grid-template-rows: minmax(190px, 1fr) minmax(300px, 1.45fr);
+  gap: 12px;
+  /* Explicit height rather than aspect-ratio: a stretched grid item silently
+     overrides aspect-ratio. */
+  height: min(74vh, 700px);
+}
+
+/*
+ * No background here on purpose. The canvas paints INK.band itself and draws its own
+ * frame, so a CSS background would be a second source of truth for the same colour
+ * and would leave the canvas sitting flush against a visible boundary.
+ */
+.band {
+  position: relative;
+  min-height: 0;
+  min-width: 0;
+}
+
+.band canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+/*
+ * The primary action, placed in the band where drawing happens.
+ *
+ * It used to live in the title block below the fold, which meant the one thing the
+ * product is for could only be found by scrolling. Sitting it on the drawing surface
+ * puts it at the point of use and keeps it in the first viewport.
+ */
+.draw-cta {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  padding: 8px 13px;
+  color: #f4efe6;
+  background: var(--oxide);
+  border: 1px solid var(--oxide);
+  cursor: pointer;
+}
+
+.draw-cta:hover {
+  background: color-mix(in srgb, var(--oxide) 84%, black);
+}
+
+.draw-cta:focus-visible {
+  outline: 2px solid var(--slate);
+  outline-offset: 2px;
+}
+
+.draw-cta[aria-pressed="true"] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--band);
+}
+
+.draw-cta__icon {
+  flex: none;
+}
+
+@media (max-width: 720px) {
+  .draw-cta {
+    top: 8px;
+    right: 8px;
+    font-size: 0.76rem;
+    padding: 7px 10px;
+  }
+}
+
+.band-road canvas {
+  cursor: grab;
+}
+
+.band-detail canvas.is-drawing,
+.band-road canvas.is-drawing {
+  cursor: crosshair;
+}
+
+.band-detail canvas.can-drag-hub {
+  cursor: move;
+}
+
+/*
+ * Readout, set as a drawing note.
+ *
+ * The first version used a 3px slate left border. The detector flagged it as the
+ * side-tab accent, which is a recognizable AI-UI tell, and it was right. A drafting
+ * sheet does not accent a note with a coloured bar, it puts NOTES under a rule and
+ * numbers them, so the fix landed closer to the world rather than further from it.
+ */
+.margin-readout {
+  border-top: var(--rule);
+  padding: 8px 0 2px;
+  min-height: 3.2em;
+}
+
+.readout-label {
+  margin: 0 0 3px;
+  font-size: 0.7rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--graphite);
+  font-weight: 700;
+}
+
+.readout-line {
+  margin: 0;
+  font-size: 0.92rem;
+  letter-spacing: 0.02em;
+}
+
+.readout-line.is-refusal {
+  color: var(--oxide);
+  font-weight: 600;
+}
+
+/* Title block, bottom right by convention. */
+.title-block {
+  border: 2px solid var(--ink);
+  padding: 10px 12px;
+  display: grid;
+  gap: 9px;
+  background: color-mix(in srgb, var(--band) 60%, transparent);
+}
+
+.tb-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.tb-label {
+  font-size: 0.7rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--graphite);
+  min-width: 6.5em;
+}
+
+.tb-value {
+  font-size: 0.82rem;
+  min-width: 3.6em;
+  text-align: right;
+}
+
+.form-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+/* Buttons are square, bordered, and flat. No radius scale, no shadow scale. */
+.btn {
+  font-family: inherit;
+  font-size: 0.78rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  padding: 6px 11px;
+  background: transparent;
+  color: var(--ink);
+  border: var(--rule);
+  cursor: pointer;
+}
+
+.btn:hover {
+  background: color-mix(in srgb, var(--graphite) 16%, transparent);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--slate);
+  outline-offset: 2px;
+}
+
+.btn[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--band);
+  border-color: var(--ink);
+}
+
+/* The sheet's only filled control. */
+.btn-primary {
+  background: var(--oxide);
+  border-color: var(--oxide);
+  color: #f4efe6;
+  font-weight: 600;
+}
+
+.btn-primary:hover {
+  background: color-mix(in srgb, var(--oxide) 84%, black);
+}
+
+.btn-primary[aria-pressed="true"] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--band);
+}
+
+/*
+ * The rut-depth gauge. A filling budget rather than a pass or fail verdict, which
+ * is the discipline donated by the cassette j-card: forty-five minutes a side is a
+ * real limit you watch yourself approach.
+ */
+.gauge {
+  position: relative;
+  flex: 1 1 140px;
+  min-width: 120px;
+  height: 14px;
+  border: var(--rule);
+  background: color-mix(in srgb, var(--graphite) 10%, transparent);
+  overflow: hidden;
+}
+
+/*
+ * Scaled with transform, never with width. Animating width thrashes layout every
+ * frame, and this is a known repeat: eigendrum's own notes already record fixing
+ * exactly this. Transform runs off the layout path.
+ */
+.gauge-fill {
+  height: 100%;
+  width: 100%;
+  background: var(--graphite);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 140ms linear;
+  will-change: transform;
+}
+
+.gauge.is-tight .gauge-fill {
+  background: color-mix(in srgb, var(--oxide) 55%, var(--graphite));
+}
+
+.gauge.is-jamming .gauge-fill {
+  background: var(--oxide);
+}
+
+/* The jamming threshold, calibrated on the equilateral triangle. */
+.gauge-mark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--ink);
+}
+
+.tb-range {
+  flex: 1 1 130px;
+  min-width: 110px;
+  accent-color: var(--slate);
+}
+
+/* 0.74rem keeps this above the 11px legibility floor at the 15px root. */
+/* Control notes, sized above the 11px legibility floor. */
+.tb-hint {
+  margin: -3px 0 0;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--graphite);
+  max-width: 62ch;
+}
+
+/* 0.74rem keeps this above the 11px legibility floor at the 15px root. */
+.tb-stamp {
+  margin: 0;
+  font-size: 0.74rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--graphite);
+  border-top: var(--hair);
+  padding-top: 7px;
+}
+
+/* Agate billing block. Dense, small, complete. */
+.spec {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px 20px;
+  border-top: 2px solid var(--ink);
+  padding-top: 10px;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--ink) 82%, var(--vellum));
+}
+
+.spec h3 {
+  margin: 0 0 3px;
+  font-size: 0.75rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--graphite);
+  font-weight: 700;
+}
+
+.spec p {
+  margin: 0;
+}
+
+.spec em {
+  font-style: italic;
+}
+
+.spec a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.spec a:hover,
+.spec a:focus-visible {
+  color: var(--slate);
+}
+
+.spec a:focus-visible {
+  outline: 2px solid var(--slate);
+  outline-offset: 2px;
+}
+
+@media (max-width: 720px) {
+  .sheet {
+    padding: 12px;
+  }
+
+  .bands {
+    /* The road band stays dominant on a phone. It is the payoff. */
+    grid-template-rows: minmax(110px, 0.8fr) minmax(230px, 1.9fr);
+    height: min(70vh, 560px);
+  }
+
+  .tb-label {
+    min-width: 100%;
+  }
+
+  .tb-value {
+    text-align: left;
+  }
+}
+
+/*
+ * Reduced motion: the roll stops and becomes a position you scrub. The payoff is
+ * still reachable, just not animated at you.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .gauge-fill {
+    transition: none;
+    will-change: auto;
+  }
+}

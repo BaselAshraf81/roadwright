@@ -1,0 +1,28 @@
+node_modules/
+dist/
+*.local
+
+# Editor and OS noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Working notes and agent scaffolding. These are how the project was built, not
+# part of what it is, and they carry unfinished decisions and internal reasoning.
+.kiro/
+.impeccable/
+skills-lock.json
+PROGRESS.md
+BRAND-SEO.md
+PRODUCT.md
+
+# The killed 3D modal-audio branch. Kept locally as a record of why that idea was
+# abandoned; it has nothing to do with this codebase.
+archive/
+
+# Scratch output
+*.webm
+*.wav
+roadwright-cut.svg
+roadwright-sheet.png
