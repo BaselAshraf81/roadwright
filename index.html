@@ -8,7 +8,7 @@
       name="description"
       content="Draw any wheel and Roadwright works out the road it rolls along with its axle dead level. A square rolls smoothly on a row of hanging-chain curves. Yours rolls on something stranger."
     />
-    <link rel="canonical" href="https://baselashraf.com/roadwright/" />
+    <link rel="canonical" href="https://roadwright.baselashraf.com/" />
     <meta name="author" content="Basel Ashraf" />
     <meta name="theme-color" content="#d8d9ce" />
     <meta property="og:type" content="website" />
@@ -17,7 +17,7 @@
       property="og:description"
       content="A square wheel rolls perfectly smoothly on the right road. Draw any wheel and Roadwright works out the road for it."
     />
-    <meta property="og:url" content="https://baselashraf.com/roadwright/" />
+    <meta property="og:url" content="https://roadwright.baselashraf.com/" />
     <meta property="og:image" content="https://baselashraf.com/media/roadwright-og.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
@@ -38,7 +38,7 @@
         "@context": "https://schema.org",
         "@type": "SoftwareApplication",
         "name": "Roadwright",
-        "url": "https://baselashraf.com/roadwright/",
+        "url": "https://roadwright.baselashraf.com/",
         "applicationCategory": "EducationalApplication",
         "operatingSystem": "Any browser",
         "description": "Draw a closed wheel and Roadwright solves the road profile that carries it with its axle at a constant height, then animates it rolling.",
@@ -59,8 +59,15 @@
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23D8D9CE'/%3E%3Cpath d='M2 22c4 0 4-8 8-8s4 8 8 8 4-8 8-8 4 8 8 8' fill='none' stroke='%231A1F23' stroke-width='2'/%3E%3Crect x='9' y='7' width='11' height='11' fill='none' stroke='%23A8342A' stroke-width='2' transform='rotate(20 14.5 12.5)'/%3E%3C/svg%3E"
     />
     <link rel="stylesheet" href="/styles/sheet.css" />
-    <!-- Google tag (gtag.js). Roadwright is served at baselashraf.com/roadwright/,
-         so it carries the same site-wide tag every other path on the domain does. -->
+    <!--
+      Google tag (gtag.js), same Measurement ID as every other property on
+      baselashraf.com. GA4 writes its cookies on the registrable root domain by
+      default, so this subdomain's traffic lands in the same property and the same
+      sessions as the rest of the site with no linker configuration needed. That
+      is a property of using one shared Measurement ID across subdomains, not
+      something this snippet has to arrange.
+    -->
+
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-GM71X3G33E"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
@@ -74,7 +81,7 @@
   <body>
     <main class="sheet" aria-labelledby="sheet-title">
       <header class="sheet-head">
-        <a class="sheet-back" href="/">Basel Ashraf</a>
+        <a class="sheet-back" href="https://baselashraf.com/">Basel Ashraf</a>
         <h1 id="sheet-title">Roadwright</h1>
         <p class="sheet-sub">Draw a wheel. See the road it rolls on.</p>
         <a
