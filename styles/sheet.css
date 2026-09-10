@@ -135,9 +135,60 @@ body {
 
 .sheet-sub {
   margin: 0;
+  margin-right: auto;
   color: var(--graphite);
   font-size: 0.95rem;
   letter-spacing: 0.04em;
+}
+
+/*
+ * The repository link, in the empty space beside the slogan.
+ *
+ * It used to sit as a full-width button at the bottom of the title block, dressed
+ * up as if it were another export action, when it is not part of the workflow at
+ * all: it is a credential about the sheet, which is exactly what belongs in a
+ * header next to the author's name. The star count is decoration on a working link,
+ * so it never blocks anything and stays hidden until a real number arrives.
+ */
+.repo-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  color: var(--graphite);
+  text-decoration: none;
+  padding: 3px 2px;
+}
+
+.repo-link__icon {
+  flex: none;
+}
+
+.repo-link:hover,
+.repo-link:focus-visible {
+  color: var(--ink);
+}
+
+.repo-link:focus-visible {
+  outline: 2px solid var(--slate);
+  outline-offset: 3px;
+}
+
+.repo-link__count {
+  padding-left: 6px;
+  border-left: var(--hair);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+@media (max-width: 480px) {
+  /* No room beside the slogan at this width, so it drops under it instead of
+     crowding onto the same line as Basel's name. */
+  .repo-link {
+    flex: 1 0 100%;
+    order: 2;
+  }
 }
 
 /* Two ruled bands. The road band is dominant, since it carries the payoff. */
@@ -316,6 +367,24 @@ body {
   flex-wrap: wrap;
 }
 
+/*
+ * Action rows now carry their own label, the same way a slider row does.
+ *
+ * Seven buttons used to run together as one undifferentiated block: pause, sound,
+ * copy link, three exports, and a star link, with nothing to say that pausing the
+ * roll and cutting a file are different kinds of action. A label per row is the
+ * same device the sliders already use, so the block reads as two short groups
+ * instead of one long one.
+ */
+.tb-actions {
+  padding-top: 2px;
+  border-top: var(--hair);
+}
+
+.tb-actions .tb-label {
+  min-width: 6.5em;
+}
+
 .tb-label {
   font-size: 0.7rem;
   letter-spacing: 0.16em;
@@ -433,25 +502,6 @@ body {
   flex: 1 1 130px;
   min-width: 110px;
   accent-color: var(--slate);
-}
-
-/* Star button. The count is appended only once a real number arrives. */
-.star-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  text-decoration: none;
-}
-
-.star-btn__icon {
-  flex: none;
-}
-
-.star-count {
-  padding-left: 7px;
-  border-left: var(--hair);
-  font-variant-numeric: tabular-nums;
-  font-weight: 700;
 }
 
 /* 0.74rem keeps this above the 11px legibility floor at the 15px root. */
