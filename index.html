@@ -168,6 +168,25 @@
           same way at the same time. Slide it to zero for a single wheel.
         </p>
 
+        <div class="tb-row">
+          <label class="tb-label" for="grade">Tilt</label>
+          <input
+            id="grade"
+            class="tb-range"
+            type="range"
+            min="-35"
+            max="35"
+            step="1"
+            value="0"
+            aria-describedby="grade-hint"
+          />
+          <span class="tb-value" id="grade-value">Level</span>
+        </div>
+        <p class="tb-hint" id="grade-hint">
+          Or drag either end of the road. The axle still tracks a straight line
+          exactly, because the derivation never mentioned gravity.
+        </p>
+
         <div class="tb-row tb-actions">
           <button id="stop-btn" class="btn" type="button">Pause roll</button>
           <button
@@ -190,6 +209,30 @@
           <button id="png-btn" class="btn" type="button">Save PNG</button>
           <button id="svg-btn" class="btn" type="button">Cut file</button>
           <button id="video-btn" class="btn" type="button">Record loop</button>
+        </div>
+
+        <div class="tb-row tb-actions">
+          <a
+            class="btn star-btn"
+            href="https://github.com/BaselAshraf81/roadwright"
+            target="_blank"
+            rel="noopener"
+          >
+            <svg
+              class="star-btn__icon"
+              viewBox="0 0 16 16"
+              width="13"
+              height="13"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <path
+                d="M8 .5l2.06 4.36 4.69.63-3.44 3.3.86 4.71L8 11.28l-4.17 2.22.86-4.71L1.25 5.49l4.69-.63z"
+              />
+            </svg>
+            <span>Star on GitHub</span>
+            <span class="star-count" id="star-count" hidden></span>
+          </a>
         </div>
 
         <p class="tb-stamp">

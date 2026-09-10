@@ -55,6 +55,7 @@ import {
 import { attachDrawing } from "./ui/draw.js";
 import { attachGradeDrag } from "./ui/grade.js";
 import { attachHubDrag } from "./ui/hub.js";
+import { showStarCount } from "./ui/stars.js";
 
 const el = <T extends HTMLElement>(id: string): T => {
   const node = document.getElementById(id);
@@ -73,6 +74,8 @@ const speedInput = el<HTMLInputElement>("speed");
 const speedValue = el<HTMLSpanElement>("speed-value");
 const wheelbaseInput = el<HTMLInputElement>("wheelbase");
 const wheelbaseValue = el<HTMLSpanElement>("wheelbase-value");
+const gradeInput = el<HTMLInputElement>("grade");
+const gradeValue = el<HTMLSpanElement>("grade-value");
 const soundBtn = el<HTMLButtonElement>("sound-btn");
 const drawBtn = el<HTMLButtonElement>("draw-btn");
 const drawBtnLabel = el<HTMLSpanElement>("draw-btn-label");
@@ -183,12 +186,28 @@ let morphing = false;
 const MORPH_TAU = 0.038;
 const MORPH_SNAP = 1e-3;
 
-function profileAt(outline: Polygon, hub: Vec): {
+/**
+ * Angular resolution of the settled solve, and of the intermediate morph frames.
+ *
+ * The morph rebuilds the whole profile on every animated frame, so it runs at a
+ * quarter of the resolution. Trapezoid error on a smooth radius profile falls as the
+ * square of the sample count, so 256 samples differ from 1024 by well under a
+ * thousandth of the period, which is far below one screen pixel. The settled result
+ * is always the full-resolution one, because that is the number the sheet reports.
+ */
+const PROFILE_SAMPLES = 1024;
+const MORPH_SAMPLES = 256;
+
+function profileAt(
+  outline: Polygon,
+  hub: Vec,
+  samples: number,
+): {
   road: Road;
   track: RollTrack;
   centred: Polygon;
 } {
-  const profile = radiusProfile(outline, hub, 1024);
+  const profile = radiusProfile(outline, hub, samples);
   return {
     road: roadFromProfile(profile),
     track: prepareRoll(profile),
@@ -202,7 +221,7 @@ function rebuildDisplay(hub: Vec): void {
   if (!s) return;
   try {
     const previousPeriod = displayRoad?.period ?? null;
-    const next = profileAt(s.outline, hub);
+    const next = profileAt(s.outline, hub, MORPH_SAMPLES);
 
     // Keep the wheel where it is in the cycle. Holding absolute distance while the
     // period shifts would make the wheel jump mid-morph.
@@ -265,7 +284,7 @@ function solve(outline: Polygon, requestedHub?: Vec, animate = false): void {
   }
 
   try {
-    const profile = radiusProfile(result.outline, result.hub, 1024);
+    const profile = radiusProfile(result.outline, result.hub, PROFILE_SAMPLES);
     const road = roadFromProfile(profile);
     const extent = radiusExtent(profile);
     const centred = result.outline.map((p) => sub(p, result.hub));
@@ -305,6 +324,54 @@ function solve(outline: Polygon, requestedHub?: Vec, animate = false): void {
       highlight: [],
     };
     snapDisplay();
+  }
+}
+
+/**
+ * Re-solve for a new axle position on the same outline.
+ *
+ * This deliberately does not go through `validateOutline`, and that is the single
+ * biggest reason dragging is now cheap. The permissible zone is a property of the
+ * outline alone, and the drag is already clamped into it, so recomputing the kernel
+ * clip and the deepest-point search on every pointer move spent hundreds of
+ * thousands of allocations re-proving something that cannot have changed. Validity
+ * still has exactly one home: this path only runs after `validateOutline` has already
+ * accepted the outline, and it falls back to the full solve if anything surprises it.
+ */
+function resolveHub(hub: Vec, animate: boolean): void {
+  const s = state.solved;
+  if (!s) {
+    solve(state.outline, hub, animate);
+    return;
+  }
+
+  try {
+    const profile = radiusProfile(s.outline, hub, PROFILE_SAMPLES);
+    const road = roadFromProfile(profile);
+    const extent = radiusExtent(profile);
+    const centred = s.outline.map((p) => sub(p, hub));
+    const track = prepareRoll(profile);
+
+    state.solved = {
+      ...s,
+      hub,
+      centred,
+      road,
+      track,
+      rMin: extent.min,
+      rMax: extent.max,
+      rutDepth: extent.rutDepth,
+      interference: interference(centred, road, track),
+    };
+    state.hub = hub;
+    state.refusal = null;
+
+    if (animate && displayHub && displayRoad) morphing = true;
+    else snapDisplay();
+  } catch {
+    // The zone should make this unreachable. If it happens, hand the position to the
+    // one place allowed to judge it rather than guessing here.
+    solve(s.outline, hub, animate);
   }
 }
 
@@ -385,7 +452,16 @@ function paintChrome(): void {
   }
 }
 
-function paintCanvases(): void {
+/**
+ * The upper band. Repainted only when the part, the axle or the zone changes.
+ *
+ * Splitting this out of the frame loop is a real saving rather than a tidy-up. The
+ * detail band hatches the permissible zone, which means clipping to a polygon that
+ * can carry a couple of hundred vertices and then stroking about a hundred hatch
+ * lines through the clip. None of it changes while the wheel rolls, and it was being
+ * redrawn on every single frame.
+ */
+function paintDetail(): void {
   const detailVp = acquire(detailCanvas);
   if (detailVp) {
     // The camera follows the settled outline only. Fitting it to the live stroke
@@ -407,7 +483,10 @@ function paintCanvases(): void {
       interference: state.solved?.interference ?? null,
     });
   }
+}
 
+/** The lower band. This is the only thing that changes frame to frame. */
+function paintRoad(): void {
   const roadVp = acquire(roadCanvas);
   if (roadVp && state.solved && displayRoad && displayTrack) {
     drawRoadBand(roadVp, {
@@ -426,6 +505,11 @@ function paintCanvases(): void {
   } else if (roadVp) {
     drawVoidBand(roadVp, state.refusal?.short ?? "NO OUTLINE SELECTED");
   }
+}
+
+function paintCanvases(): void {
+  paintDetail();
+  paintRoad();
 }
 
 function render(): void {
@@ -485,7 +569,9 @@ function frame(ts: number): void {
       maybeWhistle(ts / 1000);
     }
 
-    if (dirty) paintCanvases();
+    // Only the lower band moves. The part, its zone and its dimensions are all
+    // settled, so repainting them sixty times a second was pure cost.
+    if (dirty) paintRoad();
   } catch (err) {
     console.error(err);
   } finally {
@@ -588,6 +674,30 @@ attachDrawing(
   },
 );
 
+/*
+ * Axle drags are coalesced to one solve per animation frame.
+ *
+ * A phone reporting pointer moves at 120 Hz was driving two full solves and a DOM
+ * text rewrite per report, so the work queued faster than it could drain and the
+ * page locked up within a few seconds of holding the axle. Only the newest position
+ * matters, so the rest are dropped. The cost is at most one frame of latency, which
+ * is under nine milliseconds at that report rate.
+ */
+let pendingHub: Vec | null = null;
+let hubFrameQueued = false;
+
+function flushHubDrag(): void {
+  hubFrameQueued = false;
+  const hub = pendingHub;
+  pendingHub = null;
+  if (!hub || state.drawingMode) return;
+
+  // Ease the road, unless the visitor asked for less motion.
+  resolveHub(hub, !reducedMotion.matches);
+  if (state.solved) state.sourceId = null;
+  render();
+}
+
 // Hub dragging, clamped to the permissible zone so it cannot be made invalid.
 attachHubDrag(
   detailCanvas,
@@ -600,13 +710,17 @@ attachHubDrag(
   {
     onMove: (hub) => {
       if (state.drawingMode) return;
-      // Ease the road, unless the visitor asked for less motion.
-      solve(state.outline, hub, !reducedMotion.matches);
+      pendingHub = hub;
+      if (hubFrameQueued) return;
+      hubFrameQueued = true;
+      requestAnimationFrame(flushHubDrag);
+    },
+    onEnd: () => {
+      // The share link is only worth writing once, for the position kept.
+      if (pendingHub) flushHubDrag();
       if (state.solved) {
-        state.sourceId = null;
         writeFragment(encodeOutlineFragment(state.solved.outline, state.solved.hub));
       }
-      render();
     },
     onHoverChange: (over) => {
       if (state.drawingMode) return;
@@ -639,9 +753,7 @@ attachGradeDrag(
   },
   {
     onGrade: (grade) => {
-      state.grade = Math.max(-MAX_GRADE, Math.min(MAX_GRADE, grade));
-      paintChrome();
-      paintCanvases();
+      setGrade(grade);
     },
     onHoverChange: (over) => {
       roadCanvas.style.cursor = over ? "ns-resize" : "";
@@ -696,7 +808,31 @@ speedInput.addEventListener("input", () => {
 wheelbaseInput.addEventListener("input", () => {
   state.wheelbasePeriods = Number(wheelbaseInput.value);
   paintChrome();
-  paintCanvases();
+  // Wheelbase changes nothing in the upper band.
+  paintRoad();
+});
+
+/**
+ * Tilt, from either the road-end handles or the slider, which stay in step.
+ *
+ * The slider exists because dragging is not a reliable touch gesture here: the page
+ * has to be scrollable through the bands, so a vertical swipe belongs to the page,
+ * and a vertical drag is exactly how the handles work. A labelled control is also
+ * the only version of this that a keyboard reaches.
+ */
+function setGrade(grade: number, fromSlider = false): void {
+  state.grade = Math.max(-MAX_GRADE, Math.min(MAX_GRADE, grade));
+  if (!fromSlider) gradeInput.value = (state.grade * 100).toFixed(0);
+  gradeValue.textContent =
+    Math.abs(state.grade) < 5e-3
+      ? "Level"
+      : `${state.grade > 0 ? "+" : "\u2212"}${Math.abs(state.grade * 100).toFixed(0)}%`;
+  paintChrome();
+  paintRoad();
+}
+
+gradeInput.addEventListener("input", () => {
+  setGrade(Number(gradeInput.value) / 100, true);
 });
 
 soundBtn.addEventListener("click", () => {
@@ -824,7 +960,12 @@ function boot(): void {
   buildFormButtons();
   speedValue.textContent = state.speed.toFixed(2);
   state.wheelbasePeriods = Number(wheelbaseInput.value);
+  gradeInput.value = "0";
   applyFragment();
+
+  // Fire and forget. The count is decoration on a working link, so nothing waits
+  // for it and a failure is silent by design.
+  void showStarCount(el<HTMLSpanElement>("star-count"), "BaselAshraf81/roadwright");
 
   // A hash-only change is a same-document navigation, so the module never re-runs.
   // Without this, pasting a shared link into an open tab does nothing, and so do the

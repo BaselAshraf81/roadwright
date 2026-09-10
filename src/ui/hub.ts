@@ -23,6 +23,15 @@ import { type Camera, toScreenX, toScreenY, toWorldX, toWorldY } from "../render
 export interface HubHandlers {
   readonly onMove: (hub: Vec) => void;
   readonly onHoverChange: (overHub: boolean) => void;
+  /**
+   * Called once when the drag finishes.
+   *
+   * Exists so the caller can defer the expensive tail of a drag. Rewriting the URL
+   * fragment is the case that forced it: a drawn outline encodes to a couple of
+   * kilobytes of base36, and rewriting that on every pointer move is work nobody
+   * asked for, since only the final position is worth sharing.
+   */
+  readonly onEnd: () => void;
 }
 
 export interface HubDragging {
@@ -90,6 +99,7 @@ export function attachHubDrag(
     if (ev.pointerId !== pointerId) return;
     dragging = false;
     pointerId = null;
+    handlers.onEnd();
   };
 
   const onKey = (ev: KeyboardEvent): void => {
@@ -106,6 +116,8 @@ export function attachHubDrag(
     const dy = ev.key === "ArrowDown" ? -step : ev.key === "ArrowUp" ? step : 0;
 
     handlers.onMove(clampToZone(zone, { x: hub.x + dx, y: hub.y + dy }));
+    // A keypress is a complete gesture, so its tail runs immediately.
+    handlers.onEnd();
     ev.preventDefault();
   };
 

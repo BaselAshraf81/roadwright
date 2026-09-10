@@ -222,7 +222,14 @@ function blockingRepresentatives(ring: Polygon, maxCallouts = 2): number[] {
 
 /**
  * Clamp a point into the zone, so dragging the hub can never leave it.
- * Returns the nearest point on the zone when the input is outside.
+ *
+ * A point outside is projected to the nearest point on the zone and then pulled a
+ * hair toward the interior. The pull matters: projecting lands exactly ON the
+ * boundary, and a boundary point is where the outline is only just visible in one
+ * direction, so floating-point noise decides whether the ray solver sees one
+ * crossing or two. Half a pixel inside the edge is invisible to the visitor and
+ * removes the failure entirely, which is why dragging the axle can never produce a
+ * refusal.
  */
 export function clampToZone(zone: Polygon, p: Vec): Vec {
   const n = zone.length;
@@ -256,5 +263,11 @@ export function clampToZone(zone: Polygon, p: Vec): Vec {
       best = q;
     }
   }
-  return best;
+
+  const c = centroid(zone);
+  const inward = 1e-4;
+  return {
+    x: best.x + (c.x - best.x) * inward,
+    y: best.y + (c.y - best.y) * inward,
+  };
 }

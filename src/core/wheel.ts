@@ -10,7 +10,7 @@
  */
 
 import { type Polygon, toCounterClockwise } from "./polygon.js";
-import { type Vec, cross, sub, unit } from "./vec.js";
+import type { Vec } from "./vec.js";
 
 export interface RadiusProfile {
   /** Sample angles, ascending, starting at 0 and spanning one full turn. */
@@ -42,45 +42,58 @@ export const DEFAULT_SAMPLES = 2048;
  * point, so merging is exact rather than a fudge.
  */
 function rayCrossings(
-  ring: Polygon,
-  hub: Vec,
-  dir: Vec,
+  ax: Float64Array,
+  ay: Float64Array,
+  dirX: number,
+  dirY: number,
   tolerance: number,
-  scale: number,
-): number[] {
-  const n = ring.length;
+  mergeTolerance: number,
+  hits: number[],
+): number {
+  const n = ax.length;
   const uSlack = 1e-9;
-  const hits: number[] = [];
+  let count = 0;
 
   for (let i = 0; i < n; i++) {
-    const a = sub(ring[i]!, hub);
-    const b = sub(ring[(i + 1) % n]!, hub);
-    const edge = sub(b, a);
+    const j = i + 1 === n ? 0 : i + 1;
+    const px = ax[i]!;
+    const py = ay[i]!;
+    const ex = ax[j]! - px;
+    const ey = ay[j]! - py;
 
-    const denom = cross(dir, edge);
-    if (Math.abs(denom) < 1e-15) continue; // Ray parallel to the edge.
+    const denom = dirX * ey - dirY * ex;
+    if (denom > -1e-15 && denom < 1e-15) continue; // Ray parallel to the edge.
 
     // Solve hub + t*dir = a + u*edge, with t along the ray and u along the edge.
-    const t = cross(a, edge) / denom;
-    const u = cross(a, dir) / denom;
+    const t = (px * ey - py * ex) / denom;
+    const u = (px * dirY - py * dirX) / denom;
 
     if (t <= tolerance) continue; // Behind the hub or at it.
     if (u < -uSlack || u > 1 + uSlack) continue;
 
-    hits.push(t);
+    // Insertion sort as hits arrive. There are one or two of them in every case
+    // this function is called on, so this beats allocating and sorting an array.
+    let k = count;
+    while (k > 0 && hits[k - 1]! > t) {
+      hits[k] = hits[k - 1]!;
+      k--;
+    }
+    hits[k] = t;
+    count++;
   }
 
-  if (hits.length < 2) return hits;
+  if (count < 2) return count;
 
-  hits.sort((p, q) => p - q);
-
-  const merged: number[] = [];
-  const mergeTolerance = Math.max(scale, 1) * 1e-9;
-  for (const t of hits) {
-    const last = merged[merged.length - 1];
-    if (last === undefined || t - last > mergeTolerance) merged.push(t);
+  // Merge coincident hits. Two crossings at the same distance along one ray are the
+  // same point, which is what a ray passing exactly through a vertex produces.
+  let write = 1;
+  for (let read = 1; read < count; read++) {
+    if (hits[read]! - hits[write - 1]! > mergeTolerance) {
+      hits[write] = hits[read]!;
+      write++;
+    }
   }
-  return merged;
+  return write;
 }
 
 /**
@@ -99,26 +112,58 @@ export function radiusProfile(
   if (samples < 8) throw new Error("A radius profile needs at least eight samples.");
 
   const ring = toCounterClockwise(outline);
+  const n = ring.length;
   const tau = Math.PI * 2;
 
   const theta = new Float64Array(samples);
   const r = new Float64Array(samples);
 
-  // Scale the ray tolerance to the outline so it behaves the same at any size.
+  /*
+   * Flattened hub-relative edges, built once.
+   *
+   * The previous version rebuilt three vectors per edge inside the sample loop. On
+   * the circle preset, which is a 256-gon, at the 1024 samples the interface asks
+   * for, that was roughly 790 thousand short-lived objects for a single solve, and
+   * a hub drag ran a solve on every pointer move. Measured on a phone at 120 Hz
+   * that is enough garbage to stall the main thread outright. Same arithmetic, same
+   * results, no allocation.
+   */
+  const ax = new Float64Array(n);
+  const ay = new Float64Array(n);
   let scale = 0;
-  for (const p of ring) scale = Math.max(scale, Math.hypot(p.x - hub.x, p.y - hub.y));
+  for (let i = 0; i < n; i++) {
+    const dx = ring[i]!.x - hub.x;
+    const dy = ring[i]!.y - hub.y;
+    ax[i] = dx;
+    ay[i] = dy;
+    const d = Math.hypot(dx, dy);
+    if (d > scale) scale = d;
+  }
+
   const tolerance = Math.max(scale, 1) * 1e-12;
+  const mergeTolerance = Math.max(scale, 1) * 1e-9;
+  // Reused across every sample. Two hits is the most a valid hub ever produces, and
+  // an invalid one only has to report that it saw more than one.
+  const hits: number[] = [];
 
   for (let i = 0; i < samples; i++) {
     const th = (i / samples) * tau;
-    const hits = rayCrossings(ring, hub, unit(th), tolerance, scale);
+    const count = rayCrossings(
+      ax,
+      ay,
+      Math.cos(th),
+      Math.sin(th),
+      tolerance,
+      mergeTolerance,
+      hits,
+    );
 
-    if (hits.length === 0) {
+    if (count === 0) {
       throw new Error(
         `The hub sees no edge at ${((th * 180) / Math.PI).toFixed(1)} degrees, so it is outside the outline.`,
       );
     }
-    if (hits.length > 1) {
+    if (count > 1) {
       throw new Error(
         `The outline folds back on itself at ${((th * 180) / Math.PI).toFixed(1)} degrees as seen from the hub.`,
       );

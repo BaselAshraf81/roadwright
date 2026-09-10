@@ -373,13 +373,29 @@ export function drawDetail(vp: Viewport, state: DetailState): void {
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
   ctx.fillText("FIG 1  YOUR WHEEL", 12, 10);
+
+  /*
+   * Captions are written short on a narrow band, never drawn long and clipped.
+   *
+   * The draw button is a real DOM control pinned to this band's top right corner, so
+   * on a phone the long form of these lines ran straight under it. Same rule the
+   * refusal stamp already follows: write the short version, do not truncate the long
+   * one. The arrow-key line goes first, because a phone has no arrow keys.
+   */
+  const tight = width < 560;
   ctx.fillText(
-    zone && zone.exists ? "SHADED: WHERE THE AXLE CAN GO" : "NO AXLE POSITION WORKS",
+    zone && zone.exists
+      ? tight
+        ? "SHADED: AXLE ZONE"
+        : "SHADED: WHERE THE AXLE CAN GO"
+      : tight
+        ? "NO AXLE WORKS"
+        : "NO AXLE POSITION WORKS",
     12,
     24,
   );
   ctx.font = sheetFont(9, 500);
-  ctx.fillText("DRAG THE AXLE, OR NUDGE IT WITH ARROW KEYS", 12, 40);
+  ctx.fillText(tight ? "DRAG THE AXLE" : "DRAG THE AXLE, OR NUDGE IT WITH ARROW KEYS", 12, 40);
   if (ghost) ctx.fillText("DASHED: WHAT YOU DREW", 12, 54);
 
   drawDataTable(ctx, vp, state);

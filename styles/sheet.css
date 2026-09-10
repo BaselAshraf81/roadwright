@@ -161,10 +161,32 @@ body {
   min-width: 0;
 }
 
+/*
+ * `pan-y`, not `none`.
+ *
+ * The bands are the two tallest things on a phone, so with `touch-action: none` they
+ * swallowed every vertical swipe and the page could only be scrolled from the thin
+ * margin beside them. A visitor has no way to know that, so the sheet looked like it
+ * ended at the road and the whole title block below it was unreachable.
+ *
+ * `pan-y` hands vertical swipes back to the page and keeps everything else. A drag
+ * that starts sideways still becomes an axle drag and then has full two-axis control
+ * for the rest of the gesture, which is how a pointer-events drag behaves once the
+ * browser has decided the gesture is not a scroll.
+ */
 .band canvas {
   display: block;
   width: 100%;
   height: 100%;
+  touch-action: pan-y;
+}
+
+/*
+ * Drawing mode is explicit: the visitor pressed the pencil, so the band taking over
+ * the whole gesture is expected rather than a trap. A stroke may start in any
+ * direction, so nothing less than `none` will do here.
+ */
+.band canvas.is-drawing {
   touch-action: none;
 }
 
@@ -175,9 +197,18 @@ body {
  * product is for could only be found by scrolling. Sitting it on the drawing surface
  * puts it at the point of use and keeps it in the first viewport.
  */
+/*
+ * Bottom right, not top right.
+ *
+ * Top right is where a drafting sheet puts its own annotation, and it is also where
+ * the part ends up on a short band, so at 360 pixels wide the outline was drawn
+ * straight under the button. The lower right corner of this band is empty at every
+ * width measured, and the button is still on the drawing surface and still inside the
+ * first viewport, which were the two things that mattered about moving it here.
+ */
 .draw-cta {
   position: absolute;
-  top: 12px;
+  bottom: 12px;
   right: 12px;
   display: inline-flex;
   align-items: center;
@@ -215,7 +246,7 @@ body {
 
 @media (max-width: 720px) {
   .draw-cta {
-    top: 8px;
+    bottom: 8px;
     right: 8px;
     font-size: 0.76rem;
     padding: 7px 10px;
@@ -404,6 +435,25 @@ body {
   accent-color: var(--slate);
 }
 
+/* Star button. The count is appended only once a real number arrives. */
+.star-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  text-decoration: none;
+}
+
+.star-btn__icon {
+  flex: none;
+}
+
+.star-count {
+  padding-left: 7px;
+  border-left: var(--hair);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
 /* 0.74rem keeps this above the 11px legibility floor at the 15px root. */
 /* Control notes, sized above the 11px legibility floor. */
 .tb-hint {
@@ -477,9 +527,18 @@ body {
   }
 
   .bands {
-    /* The road band stays dominant on a phone. It is the payoff. */
-    grid-template-rows: minmax(110px, 0.8fr) minmax(230px, 1.9fr);
-    height: min(70vh, 560px);
+    /*
+     * The road band stays dominant on a phone. It is the payoff.
+     *
+     * Shorter than it was, though, and for a measured reason: a narrow band is
+     * width limited, so the scale is set by how many road periods have to fit
+     * across rather than by the height available. At 412 CSS pixels wide the
+     * assembly only needs about 120 pixels of vertical space, so a 370 pixel band
+     * left 250 pixels of bare paper above and below the road. Trimming the band
+     * both fills it and brings the readout above the fold.
+     */
+    grid-template-rows: minmax(132px, 0.78fr) minmax(196px, 1.3fr);
+    height: min(58vh, 480px);
   }
 
   .tb-label {

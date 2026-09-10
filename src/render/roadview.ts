@@ -697,19 +697,17 @@ export function drawRoadBand(vp: Viewport, state: RoadState): void {
   ctx.stroke();
   ctx.restore();
 
-  // The datum. Slate blue, reserved, and the only dead straight line on the sheet.
-  ctx.strokeStyle = INK.datum;
-  ctx.lineWidth = WEIGHT.medium;
-  ctx.beginPath();
-  ctx.moveTo(0, crisp(cam.originY));
-  ctx.lineTo(width, crisp(cam.originY));
-  ctx.stroke();
-
-  ctx.font = sheetFont(10, 600);
-  ctx.fillStyle = INK.datum;
-  ctx.textAlign = "left";
-  ctx.textBaseline = "bottom";
-  ctx.fillText("AXLE LINE  DRAG EITHER END TO TILT", 12, cam.originY - 6);
+  /*
+   * The datum is no longer drawn as a line across the sheet.
+   *
+   * It used to be, and it was the most direct statement of the claim: one dead
+   * straight rule with the outline tumbling under it. Basel asked for it gone,
+   * leaving only the two draggable ends. That is a real trade, so it is worth
+   * recording what carries the claim instead: both wheels keep their hub crosses at
+   * exactly the datum height, the car body's underside runs parallel to it, and the
+   * two handles mark its ends. The level ride is still shown, just by the parts that
+   * ride rather than by a rule drawn through them.
+   */
 
   if (rolling) {
     const wheels: ReadonlyArray<{ x: number; theta: number }> = hasAssembly
@@ -784,10 +782,18 @@ export function drawRoadBand(vp: Viewport, state: RoadState): void {
   // and annotation rather than part of the road.
   if (rolling && state.showGradeHandles) {
     const handles = gradeHandles(vp, state);
-    ctx.strokeStyle = INK.datum;
-    ctx.fillStyle = INK.band;
-    ctx.lineWidth = WEIGHT.medium;
     for (const h of [handles.left, handles.right]) {
+      // A short stub through each knob, which is all that is left of the datum. It
+      // reads as the end of a rule rather than as a floating dot, and it keeps the
+      // two ends visibly at the same height when the road is level.
+      ctx.strokeStyle = INK.datum;
+      ctx.lineWidth = WEIGHT.medium;
+      ctx.beginPath();
+      ctx.moveTo(h.x - 15, crisp(h.y));
+      ctx.lineTo(h.x + 15, crisp(h.y));
+      ctx.stroke();
+
+      ctx.fillStyle = INK.band;
       ctx.beginPath();
       ctx.arc(h.x, h.y, 7, 0, Math.PI * 2);
       ctx.fill();
@@ -802,8 +808,14 @@ export function drawRoadBand(vp: Viewport, state: RoadState): void {
       ctx.lineTo(h.x + 3.5, h.y + 2.5);
       ctx.lineWidth = WEIGHT.thin;
       ctx.stroke();
-      ctx.lineWidth = WEIGHT.medium;
     }
+
+    // Above the knob, not below it. Below, it printed straight across the road.
+    ctx.font = sheetFont(9, 600);
+    ctx.fillStyle = INK.datum;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "bottom";
+    ctx.fillText("DRAG TO TILT", handles.left.x - 15, handles.left.y - 11);
   }
 
   ctx.font = sheetFont(10, 600);

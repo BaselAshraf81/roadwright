@@ -17,7 +17,7 @@ import {
   square,
   star,
 } from "../src/core/presets.js";
-import { validateOutline } from "../src/core/validate.js";
+import { pointInConvex, validateOutline } from "../src/core/validate.js";
 import { radiusProfile } from "../src/core/wheel.js";
 import { vec } from "../src/core/vec.js";
 
@@ -201,4 +201,52 @@ describe("the zone guarantees a road exists", () => {
       }
     });
   }
+});
+
+/**
+ * Dragging the axle must never be able to produce a refusal.
+ *
+ * `clampToZone` used to project an outside point exactly ONTO the zone boundary, and
+ * a boundary point is the position where the outline is only just visible in one
+ * direction, so floating-point noise decided whether the ray solver saw one crossing
+ * or two. It now pulls a hair inward. These pin that, because the failure it prevents
+ * is invisible until a specific drag on a specific shape hits it.
+ */
+describe("the axle can never be dragged out of its zone", () => {
+  const shapes: ReadonlyArray<readonly [string, ReturnType<typeof star>]> = [
+    ["star", star()],
+    ["pentagon", regularPolygon(5, 1, Math.PI / 2)],
+    ["rounded rectangle", roundedRect()],
+  ];
+
+  for (const [name, outline] of shapes) {
+    it(`keeps a clamped axle strictly inside the zone for the ${name}`, () => {
+      const zone = hubZone(outline);
+      expect(zone.exists).toBe(true);
+
+      // Aim well outside from every direction, including straight at the corners of
+      // the zone, which is where a projection lands exactly on two edges at once.
+      const targets = [...zone.zone.map((v) => vec(v.x * 4, v.y * 4))];
+      for (let i = 0; i < 32; i++) {
+        const a = (i / 32) * Math.PI * 2;
+        targets.push(vec(Math.cos(a) * 9, Math.sin(a) * 9));
+      }
+
+      for (const target of targets) {
+        const clamped = clampToZone(zone.zone, target);
+        expect(pointInConvex(zone.zone, clamped)).toBe(true);
+        // And the whole point: the profile must actually resolve there.
+        expect(() => radiusProfile(outline, clamped, 512)).not.toThrow();
+      }
+    });
+  }
+
+  it("leaves an axle that is already inside exactly where it was", () => {
+    const zone = hubZone(roundedRect());
+    const inside = zone.suggested;
+    expect(inside).not.toBeNull();
+    const clamped = clampToZone(zone.zone, inside!);
+    expect(clamped.x).toBe(inside!.x);
+    expect(clamped.y).toBe(inside!.y);
+  });
 });
