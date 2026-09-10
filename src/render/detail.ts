@@ -48,6 +48,17 @@ export interface DetailState {
    * Drawn faintly behind the part so the change is visible rather than silent.
    */
   readonly ghost: Polygon | null;
+  /**
+   * A stroke that was turned away, drawn over the part it failed to replace.
+   *
+   * Shown rather than discarded. A stroke that vanishes on release reads as the tool
+   * being broken, which is exactly how the first version was reported.
+   */
+  readonly rejected: Polygon | null;
+  /** Short reason, stamped on the band beside the rejected stroke. */
+  readonly rejectedNote: string | null;
+  /** Points on the rejected stroke worth circling, such as where it crosses itself. */
+  readonly rejectedMarks: readonly Vec[];
 }
 
 /**
@@ -119,6 +130,82 @@ function drawDataTable(
 }
 
 const PADDING = 34;
+
+/**
+ * A refused stroke, its fault, and the reason, all on the drawing.
+ *
+ * Deliberately loud. This is the one message in the product that a visitor is
+ * guaranteed to hit by accident, and the margin note alone was demonstrably too
+ * quiet: the stroke disappeared, the previous shape came back, and the explanation
+ * sat in small type below the drawing. Stamping it here puts the reason where the
+ * stroke was, and circling the crossing answers the question the sentence cannot,
+ * which is where the problem is.
+ */
+function drawRejected(
+  ctx: CanvasRenderingContext2D,
+  vp: Viewport,
+  cam: Camera,
+  stroke: Polygon,
+  note: string,
+  marks: readonly Vec[],
+): void {
+  if (stroke.length >= 2) {
+    ctx.beginPath();
+    stroke.forEach((p, i) => {
+      const sx = toScreenX(cam, p.x);
+      const sy = toScreenY(cam, p.y);
+      if (i === 0) ctx.moveTo(sx, sy);
+      else ctx.lineTo(sx, sy);
+    });
+    ctx.closePath();
+    // Solid and heavy. This is the subject of the band now, not an annotation on
+    // something else, so it carries the same weight a settled part would.
+    ctx.strokeStyle = INK.outline;
+    ctx.lineWidth = WEIGHT.heavy;
+    ctx.lineJoin = "round";
+    ctx.stroke();
+  }
+
+  // Circle the fault. A drawing calls out a defect, it does not describe it.
+  for (const m of marks) {
+    const sx = toScreenX(cam, m.x);
+    const sy = toScreenY(cam, m.y);
+    ctx.strokeStyle = INK.outline;
+    ctx.lineWidth = WEIGHT.medium;
+    ctx.beginPath();
+    ctx.arc(sx, sy, 9, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(sx - 5.5, sy - 5.5);
+    ctx.lineTo(sx + 5.5, sy + 5.5);
+    ctx.moveTo(sx + 5.5, sy - 5.5);
+    ctx.lineTo(sx - 5.5, sy + 5.5);
+    ctx.stroke();
+  }
+
+  // Stamped across the foot of the band, in the visitor's own ink so it reads as a
+  // result rather than as chrome.
+  ctx.font = sheetFont(12, 700);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  const boxW = Math.min(ctx.measureText(note).width + 26, vp.width - 24);
+  const boxH = 26;
+  const boxX = (vp.width - boxW) / 2;
+  const boxY = vp.height - boxH - 12;
+
+  ctx.fillStyle = INK.band;
+  ctx.fillRect(boxX, boxY, boxW, boxH);
+  ctx.strokeStyle = INK.outline;
+  ctx.lineWidth = WEIGHT.medium;
+  ctx.strokeRect(crisp(boxX), crisp(boxY), boxW, boxH);
+  ctx.fillStyle = INK.outline;
+  ctx.fillText(note, vp.width / 2, boxY + boxH / 2 + 1);
+
+  // The band's own frame turns oxide, so the whole figure reads as flagged.
+  ctx.strokeStyle = INK.outline;
+  ctx.lineWidth = WEIGHT.medium;
+  ctx.strokeRect(crisp(1), crisp(1), vp.width - 3, vp.height - 3);
+}
 
 /** Camera that frames the outline, exported so hit-testing can share it. */
 export function detailCamera(vp: Viewport, outline: Polygon): Camera {
@@ -313,6 +400,39 @@ export function drawDetail(vp: Viewport, state: DetailState): void {
     return;
   }
 
+  /*
+   * A refusal owns the band, exactly the way a stroke in progress does.
+   *
+   * The first attempt drew the rejected stroke over the settled part with the zone
+   * hatch and both dimension leaders still showing. Everything was in the same oxide
+   * ink and the fault had to compete with four other things for attention, which is
+   * the opposite of what a refusal needs. The shape still being solved stays as a
+   * faint reference so the band does not look like it lost it, and FIG 2 goes on
+   * rolling it.
+   */
+  if (state.rejected && state.rejectedNote) {
+    tracePolygon(ctx, cam, outline);
+    ctx.strokeStyle = INK.graphite;
+    ctx.globalAlpha = 0.3;
+    ctx.lineWidth = WEIGHT.thin;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    drawRejected(ctx, vp, cam, state.rejected, state.rejectedNote, state.rejectedMarks);
+
+    ctx.font = sheetFont(10, 600);
+    ctx.fillStyle = INK.graphite;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText("FIG 1  YOUR WHEEL", 12, 10);
+    ctx.fillStyle = INK.outline;
+    ctx.fillText("OUTLINE REFUSED", 12, 24);
+    ctx.font = sheetFont(9, 500);
+    ctx.fillStyle = INK.graphite;
+    ctx.fillText("FAINT: THE SHAPE STILL IN USE", 12, 40);
+    return;
+  }
+
   // Permissible hub zone, hatched, drawn under the part.
   if (zone && zone.exists && zone.zone.length >= 3) {
     hatchRegion(ctx, cam, zone.zone);
@@ -395,7 +515,14 @@ export function drawDetail(vp: Viewport, state: DetailState): void {
     24,
   );
   ctx.font = sheetFont(9, 500);
-  ctx.fillText(tight ? "DRAG THE AXLE" : "DRAG THE AXLE, OR NUDGE IT WITH ARROW KEYS", 12, 40);
+  // Says what is actually true. The arrow keys act on this band, so it has to hold
+  // focus first, and claiming they just work led to a visitor pressing them, getting
+  // a scrolled page, and reasonably calling it broken.
+  ctx.fillText(
+    tight ? "DRAG THE AXLE" : "DRAG THE AXLE, OR CLICK HERE AND USE THE ARROW KEYS",
+    12,
+    40,
+  );
   if (ghost) ctx.fillText("DASHED: WHAT YOU DREW", 12, 54);
 
   drawDataTable(ctx, vp, state);

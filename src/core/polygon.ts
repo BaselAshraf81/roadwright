@@ -220,6 +220,48 @@ export function dedupe(poly: Polygon, tolerance = 1e-9): Polygon {
   return out;
 }
 
+/**
+ * Where a ring crosses itself, up to `limit` places.
+ *
+ * `selfIntersects` answers whether, which is all validity needs. This answers where,
+ * which is what a visitor needs: being told an outline crosses itself is far less
+ * useful than being shown the two strokes that cross.
+ */
+export function selfIntersectionPoints(poly: Polygon, limit = 3): Vec[] {
+  const n = poly.length;
+  const out: Vec[] = [];
+  if (n < 4) return out;
+
+  for (let i = 0; i < n; i++) {
+    const a1 = poly[i]!;
+    const a2 = poly[(i + 1) % n]!;
+    const d = sub(a2, a1);
+
+    for (let j = i + 1; j < n; j++) {
+      if (j === i || (j + 1) % n === i || (i + 1) % n === j) continue;
+      const b1 = poly[j]!;
+      const b2 = poly[(j + 1) % n]!;
+      const e = sub(b2, b1);
+
+      const denom = cross(d, e);
+      if (Math.abs(denom) < 1e-15) continue;
+
+      const off = sub(b1, a1);
+      const t = cross(off, e) / denom;
+      const u = cross(off, d) / denom;
+      // Slack at the ends, because a crossing can land on a shared vertex rather
+      // than mid-edge, and strict bounds then drop it on floating point alone. Same
+      // reasoning as the ray solver's edge parameter, which was bitten by this.
+      const s = 1e-9;
+      if (t < -s || t > 1 + s || u < -s || u > 1 + s) continue;
+
+      out.push({ x: a1.x + d.x * t, y: a1.y + d.y * t });
+      if (out.length >= limit) return out;
+    }
+  }
+  return out;
+}
+
 /** True when any two non-adjacent edges cross. O(n^2), fine at our sizes. */
 export function selfIntersects(poly: Polygon): boolean {
   const n = poly.length;

@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from "vitest";
 import { clampToZone, hubZone } from "../src/core/kernel.js";
-import { area } from "../src/core/polygon.js";
+import { area, selfIntersectionPoints, selfIntersects } from "../src/core/polygon.js";
 import {
   circle,
   crescent,
@@ -19,7 +19,7 @@ import {
 } from "../src/core/presets.js";
 import { pointInConvex, validateOutline } from "../src/core/validate.js";
 import { radiusProfile } from "../src/core/wheel.js";
-import { vec } from "../src/core/vec.js";
+import { type Vec, vec } from "../src/core/vec.js";
 
 describe("refusals", () => {
   it("refuses fewer than three points", () => {
@@ -248,5 +248,46 @@ describe("the axle can never be dragged out of its zone", () => {
     const clamped = clampToZone(zone.zone, inside!);
     expect(clamped.x).toBe(inside!.x);
     expect(clamped.y).toBe(inside!.y);
+  });
+});
+
+/**
+ * A refusal has to be able to point at the fault, not just name it.
+ *
+ * The interface circles these points on the rejected stroke. A visitor reported the
+ * self-crossing refusal as the tool being broken, because the stroke vanished and the
+ * only explanation was a line of small text elsewhere on the page, so being able to
+ * mark the exact crossing is what makes the message land.
+ */
+describe("finding where an outline crosses itself", () => {
+  it("finds the single crossing of a figure eight", () => {
+    // Offset so no sampled vertex lands exactly on the waist. That makes the crossing
+    // transversal, which is what a real freehand stroke produces.
+    const eight: Vec[] = [];
+    for (let i = 0; i < 80; i++) {
+      const t = ((i + 0.37) / 80) * Math.PI * 2;
+      eight.push(vec(Math.sin(t), Math.sin(t * 2) * 0.7));
+    }
+    expect(selfIntersects(eight)).toBe(true);
+
+    const marks = selfIntersectionPoints(eight);
+    expect(marks.length).toBeGreaterThan(0);
+    // The waist of a figure eight sits at the origin.
+    expect(Math.hypot(marks[0]!.x, marks[0]!.y)).toBeLessThan(0.05);
+  });
+
+  it("finds the two crossings of a bowtie, and puts them on the crossing edges", () => {
+    const bowtie = [vec(-1, -1), vec(1, 1), vec(1, -1), vec(-1, 1)];
+    const marks = selfIntersectionPoints(bowtie);
+    expect(marks.length).toBeGreaterThan(0);
+    for (const m of marks) {
+      expect(Math.hypot(m.x, m.y)).toBeLessThan(1e-9);
+    }
+  });
+
+  it("returns nothing for shapes that do not cross, including concave ones", () => {
+    for (const outline of [square(1), circle(1), star(), crescent()]) {
+      expect(selfIntersectionPoints(outline)).toHaveLength(0);
+    }
   });
 });

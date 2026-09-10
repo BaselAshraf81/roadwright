@@ -8,7 +8,7 @@
 
 import type { HubZone } from "./core/kernel.js";
 import type { Polygon } from "./core/polygon.js";
-import { boundingBox } from "./core/polygon.js";
+import { boundingBox, selfIntersectionPoints } from "./core/polygon.js";
 import { PRESETS, presetById } from "./core/presets.js";
 import {
   type Road,
@@ -107,11 +107,30 @@ interface Solved {
   readonly interference: number;
 }
 
+/**
+ * A stroke that was turned away, kept on screen instead of vanishing.
+ *
+ * The first version restored the previous shape and put the reason in the margin
+ * note. A visitor on Reddit read that as the drawing silently failing: their stroke
+ * disappeared, a square came back, and the sentence explaining why was a line of
+ * small text below the drawing where nobody was looking. Keeping the rejected stroke
+ * on the sheet, stamped with its reason and with the fault circled, means the
+ * feedback is where the attention already is.
+ */
+interface Rejected {
+  readonly outline: Polygon;
+  /** Short label, stamped on the band. */
+  readonly note: string;
+  /** Points worth circling, such as where the outline crosses itself. */
+  readonly marks: readonly Vec[];
+}
+
 interface AppState {
   outline: Polygon;
   hub: Vec | null;
   solved: Solved | null;
   refusal: { message: string; short: string; highlight: readonly number[] } | null;
+  rejected: Rejected | null;
   travelled: number;
   speed: number;
   paused: boolean;
@@ -132,6 +151,7 @@ const state: AppState = {
   hub: null,
   solved: null,
   refusal: null,
+  rejected: null,
   travelled: 0,
   speed: 0.8,
   paused: reducedMotion.matches,
@@ -476,6 +496,10 @@ function paintDetail(): void {
       hub: state.strokePreview ? null : state.hub,
       zone: state.strokePreview ? null : (state.solved?.zone ?? null),
       highlight: state.refusal?.highlight ?? [],
+      // A turned-away stroke, kept visible with its fault circled.
+      rejected: state.strokePreview ? null : (state.rejected?.outline ?? null),
+      rejectedNote: state.strokePreview ? null : (state.rejected?.note ?? null),
+      rejectedMarks: state.strokePreview ? [] : (state.rejected?.marks ?? []),
       rMin: state.solved?.rMin ?? null,
       rMax: state.solved?.rMax ?? null,
       period: state.solved?.road.period ?? null,
@@ -585,6 +609,7 @@ function loadPreset(id: string): void {
   state.sourceId = id;
   state.travelled = 0;
   state.strokePreview = null;
+  state.rejected = null;
   solve(preset.outline);
   writeFragment(encodePresetFragment(id));
   render();
@@ -610,6 +635,7 @@ function buildFormButtons(): void {
 function setDrawingMode(on: boolean): void {
   state.drawingMode = on;
   state.strokePreview = null;
+  if (!on) state.rejected = null;
   detailCanvas.classList.toggle("is-drawing", on);
   readout.textContent = on
     ? "Draw a closed loop in the upper band. Let go and the sheet solves its road."
@@ -624,6 +650,8 @@ attachDrawing(
   {
     onProgress: (stroke) => {
       if (!state.drawingMode) return;
+      // A new stroke supersedes the last refusal, so the old fault stops being shown.
+      state.rejected = null;
       state.strokePreview = stroke;
       paintCanvases();
     },
@@ -648,9 +676,13 @@ attachDrawing(
         return;
       }
 
-      // Refused. Say why in one line, put the sheet back, and stay in drawing mode so
-      // the next attempt needs no extra click.
+      // Refused. The stroke stays on the sheet with its fault marked, the reason is
+      // stamped on the band rather than only written in the margin, and drawing mode
+      // stays on so the next attempt needs no extra click.
       const reason = state.refusal?.message ?? "That one will not roll. Try again.";
+      const note = state.refusal?.short ?? "THIS ONE WILL NOT ROLL";
+      const marks = selfIntersectionPoints(outline);
+
       state.sourceId = previousSource;
       if (previousOutline.length >= 3) {
         solve(previousOutline, previousHub ?? undefined);
@@ -660,6 +692,7 @@ attachDrawing(
         state.solved = null;
       }
       state.refusal = null;
+      state.rejected = { outline, note, marks };
       render();
       readout.textContent = reason;
       readout.classList.add("is-refusal");
@@ -730,6 +763,24 @@ attachHubDrag(
 );
 
 detailCanvas.tabIndex = 0;
+
+/*
+ * Focus the band on any press inside it.
+ *
+ * The arrow keys are handled by a keydown listener on this canvas, which only
+ * receives anything while the canvas holds focus. Both the drawing and axle-drag
+ * handlers call `preventDefault` on pointerdown, and that suppresses the browser's
+ * own focus-on-press, so the canvas never took focus by being used. The arrow keys
+ * therefore did nothing and the page scrolled instead, which is how it shipped and
+ * how a visitor reported it. Listening in the capture phase means this runs before
+ * any handler that might stop propagation.
+ */
+detailCanvas.addEventListener(
+  "pointerdown",
+  () => detailCanvas.focus({ preventScroll: true }),
+  { capture: true },
+);
+
 detailCanvas.setAttribute("role", "application");
 detailCanvas.setAttribute(
   "aria-label",

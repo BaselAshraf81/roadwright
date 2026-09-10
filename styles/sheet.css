@@ -350,6 +350,16 @@ body {
 }
 
 /*
+ * The detail band is a focusable control, so it has to say when it holds focus.
+ * The arrow keys nudge the axle only while it does, and without a ring there was no
+ * way to tell whether pressing an arrow would move the axle or scroll the page.
+ */
+.band-detail canvas:focus-visible {
+  outline: 2px solid var(--slate);
+  outline-offset: 2px;
+}
+
+/*
  * Readout, set as a drawing note.
  *
  * The first version used a 3px slate left border. The detector flagged it as the
