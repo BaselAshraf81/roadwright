@@ -95,36 +95,6 @@ body {
   padding-bottom: 8px;
 }
 
-/* Back to the rest of the site. This lives at a path on the main domain. */
-.sheet-back {
-  order: -1;
-  flex: 1 0 100%;
-  font-size: 0.78rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--graphite);
-  text-decoration: none;
-  border-bottom: 1px solid transparent;
-  align-self: flex-start;
-  width: fit-content;
-}
-
-.sheet-back::before {
-  content: "\2190";
-  margin-right: 7px;
-}
-
-.sheet-back:hover,
-.sheet-back:focus-visible {
-  color: var(--ink);
-  border-bottom-color: var(--ink);
-}
-
-.sheet-back:focus-visible {
-  outline: 2px solid var(--slate);
-  outline-offset: 3px;
-}
-
 .sheet-head h1 {
   margin: 0;
   font-size: clamp(1.4rem, 3.4vw, 2.1rem);
@@ -135,30 +105,41 @@ body {
 
 .sheet-sub {
   margin: 0;
-  margin-right: auto;
   color: var(--graphite);
   font-size: 0.95rem;
   letter-spacing: 0.04em;
 }
 
 /*
- * The repository link, in the empty space beside the slogan.
+ * A single attribution line at the foot of the sheet, not a header.
  *
- * It used to sit as a full-width button at the bottom of the title block, dressed
- * up as if it were another export action, when it is not part of the workflow at
- * all: it is a credential about the sheet, which is exactly what belongs in a
- * header next to the author's name. The star count is decoration on a working link,
- * so it never blocks anything and stays hidden until a real number arrives.
+ * The header used to carry a link back to baselashraf.com beside the author's name,
+ * plus this same repository link. Both are true and neither belongs at the top of a
+ * page whose whole claim is that it does one thing: a page that opens with an author
+ * credit and a link to somebody's portfolio reads as a page inside that portfolio
+ * rather than as an independent tool, which is a real cost when the audience is
+ * judging exactly that. One line at the bottom, after everything the tool actually
+ * does, still credits the author and still finds the source without saying anything
+ * at the top of the page but the tool's own name.
  */
+.colophon {
+  margin: 4px 0 0;
+  padding-top: 10px;
+  border-top: var(--hair);
+  /* 0.82rem at the 15px root is 12.3px, above the 12px floor the detector checks.
+     0.74rem measured 11.1px here and was flagged. */
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  color: var(--graphite);
+}
+
 .repo-link {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.78rem;
-  letter-spacing: 0.06em;
+  margin-left: 10px;
   color: var(--graphite);
   text-decoration: none;
-  padding: 3px 2px;
 }
 
 .repo-link__icon {
@@ -180,15 +161,6 @@ body {
   border-left: var(--hair);
   font-variant-numeric: tabular-nums;
   font-weight: 700;
-}
-
-@media (max-width: 480px) {
-  /* No room beside the slogan at this width, so it drops under it instead of
-     crowding onto the same line as Basel's name. */
-  .repo-link {
-    flex: 1 0 100%;
-    order: 2;
-  }
 }
 
 /* Two ruled bands. The road band is dominant, since it carries the payoff. */
