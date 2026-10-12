@@ -135,6 +135,12 @@ export function crescent(segments = 72): Polygon {
 
 export const PRESETS: readonly Preset[] = [
   {
+    id: "octagon",
+    label: "Octagon",
+    outline: regularPolygon(8, 1, Math.PI / 8),
+    note: "Close to a circle, so the road is nearly flat. Drag a corner and watch it change.",
+  },
+  {
     id: "square",
     label: "Square",
     outline: square(1),
@@ -150,6 +156,11 @@ export const PRESETS: readonly Preset[] = [
     id: "pentagon",
     label: "Pentagon",
     outline: regularPolygon(5, 1, Math.PI / 2),
+  },
+  {
+    id: "hexagon",
+    label: "Hexagon",
+    outline: regularPolygon(6, 1, Math.PI / 2),
   },
   {
     id: "triangle",

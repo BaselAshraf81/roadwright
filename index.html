@@ -8,7 +8,7 @@
       name="description"
       content="Draw any wheel and Roadwright works out the road it rolls along with its axle dead level. A square rolls smoothly on a row of hanging-chain curves. Yours rolls on something stranger."
     />
-    <link rel="canonical" href="https://roadwright.baselashraf.com/" />
+    <link rel="canonical" href="https://baselashraf.com/roadwright/" />
     <meta name="author" content="Basel Ashraf" />
     <meta name="theme-color" content="#d8d9ce" />
     <meta property="og:type" content="website" />
@@ -17,7 +17,7 @@
       property="og:description"
       content="A square wheel rolls perfectly smoothly on the right road. Draw any wheel and Roadwright works out the road for it."
     />
-    <meta property="og:url" content="https://roadwright.baselashraf.com/" />
+    <meta property="og:url" content="https://baselashraf.com/roadwright/" />
     <meta property="og:image" content="https://baselashraf.com/media/roadwright-og.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
@@ -38,7 +38,8 @@
         "@context": "https://schema.org",
         "@type": "SoftwareApplication",
         "name": "Roadwright",
-        "url": "https://roadwright.baselashraf.com/",
+        "@id": "https://baselashraf.com/#roadwright",
+        "url": "https://baselashraf.com/roadwright/",
         "applicationCategory": "EducationalApplication",
         "operatingSystem": "Any browser",
         "description": "Draw a closed wheel and Roadwright solves the road profile that carries it with its axle at a constant height, then animates it rolling.",
@@ -60,14 +61,10 @@
     />
     <link rel="stylesheet" href="/styles/sheet.css" />
     <!--
-      Google tag (gtag.js), same Measurement ID as every other property on
-      baselashraf.com. GA4 writes its cookies on the registrable root domain by
-      default, so this subdomain's traffic lands in the same property and the same
-      sessions as the rest of the site with no linker configuration needed. That
-      is a property of using one shared Measurement ID across subdomains, not
-      something this snippet has to arrange.
+      Google tag (gtag.js), same Measurement ID as every other page on
+      baselashraf.com, so this path's traffic lands in the same property and
+      the same sessions as the rest of the site.
     -->
-
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-GM71X3G33E"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
@@ -84,6 +81,22 @@
         <h1 id="sheet-title">Roadwright</h1>
         <p class="sheet-sub">Draw a wheel. See the road it rolls on.</p>
       </header>
+
+      <!-- Shape choice and Play sit above the figures, in the first viewport. They
+           used to live in the title block below the road, where a visitor had to
+           scroll to find the one control that changes the whole sheet. -->
+      <div class="shape-bar">
+        <span class="tb-label" id="forms-label">Shape</span>
+        <div
+          class="form-list"
+          id="form-list"
+          role="group"
+          aria-labelledby="forms-label"
+        ></div>
+        <button id="stop-btn" class="btn btn-play" type="button" aria-pressed="false">
+          Play roll
+        </button>
+      </div>
 
       <div class="bands">
         <section class="band band-detail" aria-labelledby="detail-heading">
@@ -133,16 +146,6 @@
       </aside>
 
       <div class="title-block">
-        <div class="tb-row tb-forms">
-          <span class="tb-label" id="forms-label">Shape</span>
-          <div
-            class="form-list"
-            id="form-list"
-            role="group"
-            aria-labelledby="forms-label"
-          ></div>
-        </div>
-
         <div class="tb-row">
           <span class="tb-label" id="gauge-label">Catches by</span>
           <div class="gauge" id="gauge" role="img" aria-labelledby="gauge-label">
@@ -205,8 +208,7 @@
         </p>
 
         <div class="tb-row tb-actions">
-          <span class="tb-label">Playback</span>
-          <button id="stop-btn" class="btn" type="button">Pause roll</button>
+          <span class="tb-label">Sound</span>
           <button
             id="sound-btn"
             class="btn"

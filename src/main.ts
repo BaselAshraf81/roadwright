@@ -55,6 +55,7 @@ import {
 import { attachDrawing } from "./ui/draw.js";
 import { attachGradeDrag } from "./ui/grade.js";
 import { attachHubDrag } from "./ui/hub.js";
+import { MAX_HANDLES, attachVertexDrag } from "./ui/vertices.js";
 import { showStarCount } from "./ui/stars.js";
 
 const el = <T extends HTMLElement>(id: string): T => {
@@ -156,7 +157,9 @@ const state: AppState = {
   rejected: null,
   travelled: 0,
   speed: 0.8,
-  paused: reducedMotion.matches,
+  // Parked until the visitor presses Play. They look at the wheel and the road first,
+  // then press play to see whether the road really holds the axle level.
+  paused: true,
   drawingMode: false,
   strokePreview: null,
   sourceId: null,
@@ -176,6 +179,16 @@ let spinVoice: SpinVoice | null = null;
 const spinTrigger = new SpinTrigger();
 
 let detailCam: Camera | null = null;
+
+/**
+ * Held for the length of a corner drag.
+ *
+ * The camera normally refits to the settled outline. While a corner is being pulled
+ * that outline changes every frame, so a refitting camera would move the view under
+ * the pointer and the corner would slide away from the cursor. Same bug class as the
+ * drawing camera, same fix: the view holds still until the pointer lets go.
+ */
+let cameraLock: Camera | null = null;
 
 /**
  * Eased view of the road.
@@ -459,7 +472,8 @@ function paintChrome(): void {
   drawBtn.setAttribute("aria-pressed", String(state.drawingMode));
   // Only the label changes, so the pencil glyph survives the update.
   drawBtnLabel.textContent = state.drawingMode ? "Cancel" : "Draw a wheel";
-  stopBtn.textContent = state.paused ? "Resume roll" : "Pause roll";
+  stopBtn.textContent = state.paused ? "Play roll" : "Pause roll";
+  stopBtn.setAttribute("aria-pressed", String(!state.paused));
 
   const wb = state.wheelbasePeriods;
   wheelbaseValue.textContent = wb === 0 ? "One wheel" : `${wb.toFixed(2)} P`;
@@ -491,9 +505,11 @@ function paintDetail(): void {
   if (detailVp) {
     // The camera follows the settled outline only. Fitting it to the live stroke
     // would move the view under the pointer and corrupt the capture.
-    detailCam = state.outline.length >= 3 ? detailCamera(detailVp, state.outline) : null;
+    detailCam =
+      cameraLock ?? (state.outline.length >= 3 ? detailCamera(detailVp, state.outline) : null);
     drawDetail(detailVp, {
       outline: state.outline,
+      handles: editableCorners(),
       // Shown faintly behind the part whenever bridging changed the drawing, so the
       // visitor can see exactly what was altered.
       ghost: state.solved?.adjusted ? state.solved.original : null,
@@ -767,6 +783,78 @@ attachHubDrag(
   },
 );
 
+/**
+ * The corners a visitor may grab, or null.
+ *
+ * The drawing as drawn, not the solved outline: when a drawing is smoothed or bridged
+ * the solved shape has different vertices, and dragging the dashed original is what
+ * the visitor expects. Only for outlines with few corners and only when a road exists.
+ */
+function editableCorners(): Polygon | null {
+  const s = state.solved;
+  if (!s || state.drawingMode || state.strokePreview || state.rejected) return null;
+  return s.original.length >= 3 && s.original.length <= MAX_HANDLES ? s.original : null;
+}
+
+let pendingCorner: { index: number; to: Vec } | null = null;
+let cornerFrameQueued = false;
+
+function flushCornerDrag(): void {
+  cornerFrameQueued = false;
+  const move = pendingCorner;
+  pendingCorner = null;
+  const s = state.solved;
+  if (!move || !s) return;
+
+  const next = s.original.map((p, i) => (i === move.index ? move.to : p));
+
+  // Keep the axle where it is while it still works, otherwise fall back to the default.
+  let result = validateOutline(next, state.hub ?? undefined);
+  if (!result.ok && result.refusal.code === "axle-outside-zone") {
+    result = validateOutline(next);
+  }
+  // A position that crosses the outline over itself, or leaves no road, is simply
+  // not taken: the corner stays at the last good place until the pointer comes back.
+  if (!result.ok) return;
+
+  state.sourceId = null;
+  solve(next, result.hub);
+  render();
+}
+
+attachVertexDrag(
+  detailCanvas,
+  () => ({
+    camera: detailCam,
+    vertices: editableCorners(),
+    hub: state.hub,
+    enabled: !state.drawingMode,
+  }),
+  {
+    onStart: () => {
+      cameraLock = detailCam;
+    },
+    onMove: (index, to) => {
+      pendingCorner = { index, to };
+      if (cornerFrameQueued) return;
+      cornerFrameQueued = true;
+      requestAnimationFrame(flushCornerDrag);
+    },
+    onEnd: () => {
+      if (pendingCorner) flushCornerDrag();
+      cameraLock = null;
+      if (state.solved) {
+        writeFragment(encodeOutlineFragment(state.solved.original, state.solved.hub));
+      }
+      render();
+    },
+    onHoverChange: (over) => {
+      if (state.drawingMode) return;
+      detailCanvas.classList.toggle("can-drag-corner", over);
+    },
+  },
+);
+
 detailCanvas.tabIndex = 0;
 
 /*
@@ -789,7 +877,7 @@ detailCanvas.addEventListener(
 detailCanvas.setAttribute("role", "application");
 detailCanvas.setAttribute(
   "aria-label",
-  "Your shape. Drag the axle, or nudge it with the arrow keys, to change the road.",
+  "Your shape. Drag the axle, or nudge it with the arrow keys, to change the road. Corners of simple shapes can be dragged too.",
 );
 
 // Tilting the road by dragging either end of the datum.
@@ -971,7 +1059,9 @@ videoBtn.addEventListener("click", () => {
 });
 
 reducedMotion.addEventListener("change", () => {
-  state.paused = reducedMotion.matches;
+  // Switching motion back on must not start the car by itself: it stays parked until
+  // the visitor presses Play. Switching it off stops the roll.
+  if (reducedMotion.matches) state.paused = true;
   render();
 });
 
@@ -1009,7 +1099,9 @@ function applyFragment(): void {
     }
   }
 
-  loadPreset("square");
+  // Open on an octagon, not the square. A near-circle with a gentle road invites a
+  // drag, and the square's catenaries are one click away in the shape bar.
+  loadPreset("octagon");
 }
 
 function boot(): void {

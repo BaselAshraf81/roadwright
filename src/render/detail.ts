@@ -59,6 +59,11 @@ export interface DetailState {
   readonly rejectedNote: string | null;
   /** Points on the rejected stroke worth circling, such as where it crosses itself. */
   readonly rejectedMarks: readonly Vec[];
+  /**
+   * Corners the visitor can grab, when the outline is simple enough to edit by hand.
+   * Null for freehand loops and during drawing, where a dozen handles would be noise.
+   */
+  readonly handles: Polygon | null;
 }
 
 /**
@@ -346,7 +351,7 @@ function drawRadiusLeader(
 
 export function drawDetail(vp: Viewport, state: DetailState): void {
   const { ctx, width, height } = vp;
-  const { outline, hub, zone, highlight, rMin, rMax, preview, ghost } = state;
+  const { outline, hub, zone, highlight, rMin, rMax, preview, ghost, handles } = state;
 
   ctx.fillStyle = INK.band;
   ctx.fillRect(0, 0, width, height);
@@ -463,6 +468,20 @@ export function drawDetail(vp: Viewport, state: DetailState): void {
   ctx.lineJoin = "round";
   ctx.stroke();
 
+  // Grab handles: small square marks, the way a drafting sheet shows a control point.
+  if (handles && handles.length > 0) {
+    const half = 4;
+    ctx.fillStyle = INK.band;
+    ctx.strokeStyle = INK.outline;
+    ctx.lineWidth = WEIGHT.medium;
+    for (const v of handles) {
+      const sx = toScreenX(cam, v.x);
+      const sy = toScreenY(cam, v.y);
+      ctx.fillRect(sx - half, sy - half, half * 2, half * 2);
+      ctx.strokeRect(sx - half, sy - half, half * 2, half * 2);
+    }
+  }
+
   // Called-out vertices, when a refusal has something to point at.
   if (highlight.length > 0) {
     ctx.strokeStyle = INK.outline;
@@ -523,7 +542,12 @@ export function drawDetail(vp: Viewport, state: DetailState): void {
     12,
     40,
   );
-  if (ghost) ctx.fillText("DASHED: WHAT YOU DREW", 12, 54);
+  let captionY = 54;
+  if (handles && handles.length > 0) {
+    ctx.fillText(tight ? "DRAG A CORNER" : "DRAG A CORNER TO RESHAPE THE WHEEL", 12, captionY);
+    captionY += 14;
+  }
+  if (ghost) ctx.fillText("DASHED: WHAT YOU DREW", 12, captionY);
 
   drawDataTable(ctx, vp, state);
 

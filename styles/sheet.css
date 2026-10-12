@@ -317,8 +317,81 @@ body {
   cursor: crosshair;
 }
 
-.band-detail canvas.can-drag-hub {
+.band-detail canvas.can-drag-hub,
+.band-detail canvas.can-drag-corner {
   cursor: move;
+}
+
+/*
+ * Shape choice and Play, above the bands.
+ *
+ * Both used to sit in the title block under the road, so on a laptop a visitor had to
+ * scroll to find any shape but the one the page opened on, and the car was already
+ * rolling before they had looked at the wheel. Above the figures they are in the first
+ * viewport. Play is the one filled button, because it is the next thing to do.
+ */
+.shape-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  margin: 0 0 12px;
+}
+
+.shape-bar .tb-label {
+  min-width: 0;
+}
+
+.shape-bar .form-list {
+  flex: 1 1 auto;
+}
+
+.shape-bar .btn-play {
+  margin-left: auto;
+  background: var(--ink);
+  color: var(--band);
+  border-color: var(--ink);
+  min-width: 7.5em;
+}
+
+.shape-bar .btn-play:hover {
+  background: color-mix(in srgb, var(--ink) 82%, var(--band));
+}
+
+@media (max-width: 720px) {
+  /*
+   * Label and Play share the first row, the shape buttons wrap beneath. The buttons
+   * wrapped to three rows with Play stranded on a fourth, which spent about 150 pixels
+   * of a phone screen before the figure even started.
+   */
+  .shape-bar {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .shape-bar .tb-label {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .shape-bar .btn-play {
+    grid-column: 2;
+    grid-row: 1;
+    margin-left: 0;
+  }
+
+  .shape-bar .form-list {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .shape-bar .btn {
+    font-size: 0.7rem;
+    padding: 6px 8px;
+  }
 }
 
 /*
