@@ -127,6 +127,50 @@ function deepestPoint(zone: Polygon): Vec | null {
       }
     }
   }
+
+  // The samples above are only a start. The zone is convex, so depth has one peak,
+  // and a pattern search walks onto it: try sixteen directions, take any improvement,
+  // and halve the step when none helps. This is what puts the axle in the middle of a
+  // lopsided zone instead of merely near it.
+  const insideZone = (p: Vec): boolean => {
+    const n = zone.length;
+    for (let i = 0; i < n; i++) {
+      const a = zone[i]!;
+      const b = zone[(i + 1) % n]!;
+      if ((b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x) < 0) return false;
+    }
+    return true;
+  };
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const v of zone) {
+    if (v.x < minX) minX = v.x;
+    if (v.x > maxX) maxX = v.x;
+    if (v.y < minY) minY = v.y;
+    if (v.y > maxY) maxY = v.y;
+  }
+  const span = Math.max(maxX - minX, maxY - minY);
+  let step = span * 0.1;
+  const directions = 16;
+  for (let guard = 0; guard < 200 && step > span * 1e-7; guard++) {
+    let moved = false;
+    for (let k = 0; k < directions; k++) {
+      const a = (k / directions) * Math.PI * 2;
+      const p = { x: best.x + Math.cos(a) * step, y: best.y + Math.sin(a) * step };
+      // Distance to the boundary is unsigned, so a point outside the zone can score
+      // higher than any inside it. Only walk through the interior.
+      if (!insideZone(p)) continue;
+      const d = distanceToBoundary(p);
+      if (d > bestDepth + 1e-15) {
+        bestDepth = d;
+        best = p;
+        moved = true;
+      }
+    }
+    if (!moved) step *= 0.5;
+  }
   return best;
 }
 

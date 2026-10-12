@@ -93,6 +93,8 @@ interface Solved {
   /** Exactly what the visitor drew, ghosted in FIG 1 when it had to be bridged. */
   readonly original: Polygon;
   readonly adjusted: boolean;
+  /** True when only tiny dents were smoothed over, rather than a pocket bridged. */
+  readonly smoothed: boolean;
   readonly deviation: number;
   readonly hub: Vec;
   readonly zone: HubZone;
@@ -314,6 +316,7 @@ function solve(outline: Polygon, requestedHub?: Vec, animate = false): void {
       outline: result.outline,
       original: result.original,
       adjusted: result.adjusted,
+      smoothed: result.smoothed,
       deviation: result.deviation,
       hub: result.hub,
       zone: result.zone,
@@ -412,7 +415,9 @@ function describe(): string {
   // Say what was changed before saying anything else about it. Adjusting a drawing
   // and then reporting figures as if nothing happened would be the dishonest version.
   const adjustedNote = s.adjusted
-    ? `Your outline had a pocket the axle could not see into, so it was bridged across to make a wheel. The faint line shows what you drew. `
+    ? s.smoothed
+      ? `Your outline had tiny dents the axle could not see past, so they were smoothed over to make a wheel. The faint line shows what you drew. `
+      : `Your outline had a pocket the axle could not see into, so it was bridged across to make a wheel. The faint line shows what you drew. `
     : "";
 
   const gradeNote =

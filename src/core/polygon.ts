@@ -83,6 +83,40 @@ export function boundingBox(poly: Polygon): {
   return { min: { x: minX, y: minY }, max: { x: maxX, y: maxY } };
 }
 
+/**
+ * Convex hull, counterclockwise, with collinear points dropped.
+ *
+ * Andrew's monotone chain. Used to smooth over dents so small that a hand could have
+ * made them, which would otherwise carve most of the axle zone away.
+ */
+export function convexHull(poly: Polygon): Polygon {
+  const pts = [...poly].sort((a, b) => a.x - b.x || a.y - b.y);
+  if (pts.length < 3) return pts;
+
+  const turn = (o: Vec, a: Vec, b: Vec): number => cross(sub(a, o), sub(b, o));
+
+  const lower: Vec[] = [];
+  for (const p of pts) {
+    while (lower.length >= 2 && turn(lower[lower.length - 2]!, lower[lower.length - 1]!, p) <= 0) {
+      lower.pop();
+    }
+    lower.push(p);
+  }
+
+  const upper: Vec[] = [];
+  for (let i = pts.length - 1; i >= 0; i--) {
+    const p = pts[i]!;
+    while (upper.length >= 2 && turn(upper[upper.length - 2]!, upper[upper.length - 1]!, p) <= 0) {
+      upper.pop();
+    }
+    upper.push(p);
+  }
+
+  lower.pop();
+  upper.pop();
+  return lower.concat(upper);
+}
+
 /** Crossing-number containment test. Points exactly on an edge may go either way. */
 export function containsPoint(poly: Polygon, p: Vec): boolean {
   const n = poly.length;

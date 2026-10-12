@@ -21,6 +21,7 @@ import {
   type Polygon,
   area,
   boundingBox,
+  convexHull,
   dedupe,
   selfIntersects,
 } from "./polygon.js";
@@ -56,8 +57,13 @@ export interface ValidOutline {
   readonly outline: Polygon;
   /** Exactly what the visitor drew, kept so the interface can show the difference. */
   readonly original: Polygon;
-  /** True when bridging was needed to make the drawing roll. */
+  /** True when the solved outline differs from the drawing (bridged or smoothed). */
   readonly adjusted: boolean;
+  /**
+   * True when the change was only smoothing over tiny dents in a near-convex drawing,
+   * as opposed to bridging a real pocket. The interface words the two differently.
+   */
+  readonly smoothed: boolean;
   /** Largest bridged gap as a fraction of the shape's size. Zero when untouched. */
   readonly deviation: number;
   readonly zone: HubZone;
@@ -138,6 +144,25 @@ export function validateOutline(
   // First try the drawing exactly as it is, which is always the best fidelity.
   const directZone = hubZone(original);
   if (directZone.exists && directZone.suggested !== null) {
+    // A hand never draws a perfectly smooth curve. Every tiny inward wobble puts a
+    // line through the whole shape and the axle zone loses everything on the wrong
+    // side, so a drawn Reuleaux triangle ends up with half a zone and an axle that
+    // sits to one side. When the drawing is nearly convex anyway, solve the smoothed
+    // version and keep the original as the ghost, exactly as bridging does.
+    const smoothed = smoothNearConvex(original, directZone);
+    if (smoothed) {
+      const settled = settle(
+        smoothed.outline,
+        original,
+        true,
+        smoothed.deviation,
+        smoothed.zone,
+        requestedHub,
+        true,
+      );
+      if (settled) return settled;
+    }
+
     const settled = settle(original, original, false, 0, directZone, requestedHub);
     if (settled) return settled;
   }
@@ -174,6 +199,43 @@ export function validateOutline(
   };
 }
 
+/** Act only when dents cost more than a tenth of the shape from the axle zone... */
+const SMOOTH_ZONE_SHARE = 0.9;
+/** ...and only when the convex hull adds at most this fraction of the drawing's area. */
+const SMOOTH_MAX_EXTRA_AREA = 0.03;
+
+interface Smoothed {
+  readonly outline: Polygon;
+  readonly zone: HubZone;
+  readonly deviation: number;
+}
+
+/**
+ * Replace a nearly convex drawing with its convex hull.
+ *
+ * Returns null, leaving the drawing untouched, unless two things hold: the dents have
+ * visibly shrunk the axle zone, and the hull is barely larger than the drawing. A
+ * star or a crescent fails the second test by a wide margin, so real concavity is
+ * never smoothed away. Measured on drawn Reuleaux triangles, a wobble of 1.5% of the
+ * shape's width left the zone at 56% of the shape before this and the whole shape after.
+ */
+function smoothNearConvex(original: Polygon, zone: HubZone): Smoothed | null {
+  const shape = area(original);
+  if (!(shape > 0)) return null;
+  if (area(zone.zone) >= shape * SMOOTH_ZONE_SHARE) return null;
+
+  const hull = convexHull(original);
+  if (hull.length < 3) return null;
+
+  const extra = (area(hull) - shape) / shape;
+  if (extra > SMOOTH_MAX_EXTRA_AREA) return null;
+
+  const hullZone = hubZone(hull);
+  if (!hullZone.exists || hullZone.suggested === null) return null;
+
+  return { outline: hull, zone: hullZone, deviation: Math.max(0, extra) };
+}
+
 function settle(
   outline: Polygon,
   original: Polygon,
@@ -181,6 +243,7 @@ function settle(
   deviation: number,
   zone: HubZone,
   requestedHub?: Vec,
+  smoothed = false,
 ): ValidationResult | null {
   if (zone.suggested === null) return null;
 
@@ -198,7 +261,16 @@ function settle(
         ),
       };
     }
-    return { ok: true, outline, original, adjusted, deviation, zone, hub: requestedHub };
+    return {
+      ok: true,
+      outline,
+      original,
+      adjusted,
+      smoothed,
+      deviation,
+      zone,
+      hub: requestedHub,
+    };
   }
 
   return {
@@ -206,6 +278,7 @@ function settle(
     outline,
     original,
     adjusted,
+    smoothed,
     deviation,
     zone,
     hub: zone.suggested,
